@@ -34,7 +34,7 @@ public class App extends Application {
         // 3. Instanciar Adaptador de Entrada (Inyectando los Casos de Uso)
         DroneController controller = new DroneController(crearUC, listarUC, actualizarUC, eliminarUC);
 
-        // 4. Iniciar la UI (JavaFX)
+        // 4. Iniciar la UI 
         DroneView root = new DroneView(controller);
         Scene scene = new Scene(root, 1100, 700);
 
