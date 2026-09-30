@@ -27,18 +27,45 @@ El proyecto está rigurosamente dividido por responsabilidades para proteger el 
 
 ```text
 src/main/java/
+├── module-info.java
+│
 ├── co/edu/poli/SW2/
-│   └── App.java                           # WIRING: Punto de entrada e inyección de dependencias
+│   └── App.java
 │
 └── com/drone/
-    ├── dominio/modelo/                    # NÚCLEO: Clases puras (Drone, Agricultura, Vigilancia)
-    │
     ├── aplicacion/
     │   ├── puerto/
-    │   │   ├── entrada/                   # INTERFACES USE CASE (CrearDroneUseCase, Listar...)
-    │   │   └── salida/                    # INTERFAZ REPOSITORY (DroneRepository)
-    │   └── servicio/                      # IMPLEMENTACIONES (CrearDroneServicio, Listar...)
+    │   │   ├── entrada/
+    │   │   │   ├── ActualizarDroneUseCase.java
+    │   │   │   ├── CrearDroneUseCase.java
+    │   │   │   ├── EliminarDroneUseCase.java
+    │   │   │   └── ListarDronesUseCase.java
+    │   │   │
+    │   │   └── salida/
+    │   │       └── DroneRepository.java
+    │   │
+    │   └── servicio/
+    │       ├── ActualizarDroneServicio.java
+    │       ├── CrearDroneServicio.java
+    │       ├── EliminarDroneServicio.java
+    │       └── ListarDronesServicio.java
+    │
+    ├── dominio/
+    │   └── modelo/
+    │       ├── Agricultura.java
+    │       ├── Drone.java
+    │       ├── Mision.java
+    │       ├── Piloto.java
+    │       ├── Sensor.java
+    │       └── Vigilancia.java
     │
     └── infraestructura/
-        ├── persistencia/                  # ADAPTADORES SALIDA (PostgresDroneRepository, Singleton)
-        └── vista/                         # ADAPTADORES ENTRADA (DroneController, DroneView)
+        ├── persistencia/
+        │   ├── PostgresDroneRepository.java
+        │   └── Singleton.java
+        │
+        ├── ui/
+        │   └── DroneController.java
+        │
+        └── vista/
+            └── DroneView.java
