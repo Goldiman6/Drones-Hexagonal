@@ -25,19 +25,19 @@ public class DroneController {
         this.eliminarDroneUseCase = eliminarDroneUseCase;
     }
 
-    public boolean addDrone(Drone drone) throws Exception {
-        return crearDroneUseCase.ejecutar(drone);
+    public void addDrone(Drone drone) throws Exception {
+        crearDroneUseCase.ejecutar(drone);
     }
 
-    public List<Drone> getAllDrones() {
+    public List<Drone> getAllDrones() throws Exception {
         return listarDronesUseCase.ejecutar();
     }
 
-    public boolean updateDrone(Drone drone) throws Exception {
-        return actualizarDroneUseCase.ejecutar(drone);
+    public void updateDrone(Drone drone) throws Exception {
+        actualizarDroneUseCase.ejecutar(drone);
     }
 
-    public boolean deleteDrone(String id) throws Exception {
-        return eliminarDroneUseCase.ejecutar(id);
+    public void deleteDrone(String id) throws Exception {
+        eliminarDroneUseCase.ejecutar(id);
     }
 }

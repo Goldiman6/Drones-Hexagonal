@@ -1,5 +1,2 @@
 package com.drone.aplicacion.puerto.entrada;
-
-public interface EliminarDroneUseCase {
-    boolean ejecutar(String id);
-}
+public interface EliminarDroneUseCase { void ejecutar(String id) throws Exception; }

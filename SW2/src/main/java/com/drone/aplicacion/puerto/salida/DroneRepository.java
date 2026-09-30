@@ -4,8 +4,8 @@ import com.drone.dominio.modelo.Drone;
 import java.util.List;
 
 public interface DroneRepository {
-    boolean guardar(Drone drone);
-    List<Drone> listar();
-    boolean actualizar(Drone drone);
-    boolean eliminar(String id);
+    void guardar(Drone drone) throws Exception;
+    List<Drone> listar() throws Exception;
+    void actualizar(Drone drone) throws Exception;
+    void eliminar(String id) throws Exception;
 }
