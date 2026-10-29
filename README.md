@@ -1,348 +1,296 @@
-🚁 Gestor de Drones — Arquitectura Hexagonal & Patrones de Comportamiento
+# Gestor de Drones - Arquitectura Hexagonal & Patrones de Comportamiento
 
-Proyecto académico desarrollado para el curso Ingeniería de Software II.
-Implementa una arquitectura hexagonal completa con cuatro patrones de comportamiento integrados sobre un sistema de gestión de vehículos aéreos no tripulados.
+Aplicación para la gestión de vehículos aéreos no tripulados (Drones), desarrollada bajo una estricta **Arquitectura Hexagonal (Ports & Adapters)** e integrando los patrones de diseño de comportamiento **Observer** y **Chain of Responsibility** para el monitoreo meteorológico y la evaluación de viabilidad de vuelo en tiempo real.
 
-📋 Descripción General
+---
 
-Sistema desktop desarrollado en Java con JavaFX para la administración integral de drones, con persistencia en PostgreSQL, consulta de clima en tiempo real mediante las APIs de Open-Meteo, y la implementación de cuatro patrones de diseño de comportamiento:
+## 🚀 Funcionalidades del Sistema
 
-#	Patrón	Propósito
-1	Observer	Suscripción de drones a alertas climáticas en tiempo real
-2	Chain of Responsibility	Evaluación secuencial de 5 condiciones de viabilidad de vuelo
-3	Strategy	Cálculo de consumo energético ponderado por peso del dron
-4	Command	Programación y ejecución secuencial de tareas de misión
-🛠️ Tecnologías Utilizadas
-Tecnología	Versión	Uso
-Java	11 / 21	Lenguaje principal
-JavaFX	13	Interfaz gráfica de usuario
-PostgreSQL	42.7.3	Persistencia relacional
-Jackson Databind	2.15.2	Procesamiento JSON
-Apache Maven	—	Gestión de dependencias y build
-java.net.http	(JDK 11)	Cliente HTTP para APIs externas
+### 1. Gestión Integral de Drones (CRUD)
+- **Drones de Agricultura:** Registro, listado, actualización y eliminación de drones con atributos especializados como la **capacidad del tanque de fumigación (L)**.
+- **Drones de Vigilancia:** Administración de drones de seguridad con configuración de **detección térmica**.
+- **Persistencia en PostgreSQL:** Almacenamiento relacional robusto con validación de restricciones únicas (`id` y `serial`) y manejo amigable de errores mediante pop-ups JavaFX.
 
-Patrones Arquitectónicos:
+### 2. Monitoreo Climático en Tiempo Real (Patrón Observer)
+- **Suscripción Dinámica en Memoria:** Permite seleccionar cualquier dron de la tabla y suscribirlo/desuscribirlo del sistema de alertas climáticas mediante los botones **Suscribir** y **Desuscribir** (sin alterar la base de datos).
+- **Notificación Multicast:** Al consultar las condiciones climáticas de una ciudad, el `WeatherSubject` notifica automáticamente a todos los drones observadores suscritos con los datos meteorológicos actualizados.
 
-Hexagonal (Ports & Adapters) — Desacoplamiento total entre capas
-Singleton — Conexión única a base de datos
-Factory Method — Ensamblado de la cadena de responsabilidad
-✨ Funcionalidades
-1. 📁 Gestión de Drones (CRUD)
-Registro, consulta, actualización y eliminación de drones.
-Drones de Agricultura: atributo especializado capacidadTanque (L).
-Drones de Vigilancia: atributo especializado detecciónTérmica (boolean).
-Persistencia en PostgreSQL con manejo de errores de restricciones únicas (id, serial).
-2. 📡 Monitoreo Climático — Patrón Observer
-Suscripción y desuscripción dinámica de drones al sistema de alertas (sin modificar la BD).
-Al consultar el clima de una ciudad, el WeatherSubject notifica automáticamente a todos los drones suscritos con las condiciones meteorológicas actuales.
-3. ✈️ Evaluación de Viabilidad de Vuelo — Patrón Chain of Responsibility
+### 3. Evaluación de Viabilidad de Vuelo (Patrón Chain of Responsibility)
+- **Cadena de Validación Estricta:** Evalúa secuencialmente las condiciones climáticas actuales obtenidas desde APIs externas para determinar si la flota de drones puede operar de manera segura.
+- **Reglas de Operación:**
+  1. `TemperatureHandler`: Temperatura entre **0°C y 40°C**.
+  2. `HumidityHandler`: Humedad relativa **≤ 85%**.
+  3. `WindHandler`: Velocidad del viento **≤ 40 km/h**.
+  4. `PressureHandler`: Presión atmosférica entre **950 y 1050 hPa**.
+  5. `VisibilityHandler`: Visibilidad **≥ 5 km**.
+- **Detención Inmediata:** Si alguna condición no se cumple, la cadena se detiene en ese eslabón y genera un informe de rechazo indicando la regla exacta violada y el valor registrado. Si todas se cumplen, emite el veredicto: `CLIMA APTO PARA OPERACIÓN DE DRONES`.
 
-La cadena evalúa las condiciones en orden estricto. Si alguna falla, la evaluación se detiene inmediatamente e informa la regla incumplida:
+### 4. Integración con APIs Meteorológicas Externas
+- **API de Geocodificación (Open-Meteo):** Convierte el nombre de la ciudad seleccionada (`Bogota` o `Brujas`) en coordenadas geográficas (`latitud` y `longitud`).
+- **API de Pronóstico / Clima Actual (Open-Meteo):** Consulta en tiempo real los 5 aspectos meteorológicos clave mediante peticiones HTTP asíncronas con Java 11 `HttpClient` y parseo JSON con Jackson.
 
-Eslabón	Regla
-TemperatureHandler	Temperatura entre 0 °C y 40 °C
-HumidityHandler	Humedad relativa ≤ 85 %
-WindHandler	Velocidad del viento ≤ 40 km/h
-PressureHandler	Presión atmosférica entre 950 y 1050 hPa
-VisibilityHandler	Visibilidad ≥ 5 km
-4. 🔋 Consumo Energético por Ruta — Patrón Strategy
+### 5. Estimación de Consumo Energético por Ruta (Patrón Strategy Ponderado por Peso)
+- **Carga de Rutas JSON:** Lee rutas de vuelo con puntos geográficos de origen y destino (`ruta.json`).
+- **Cálculo Geodésico (Haversine):** Traduce las coordenadas de latitud y longitud a distancia real en kilómetros.
+- **Estrategias Polimórficas Afectadas por el Peso:**
+  1. `AhorroStrategy`: Minimiza el consumo (`distancia * 0.5 * (1 + peso * 0.01)`).
+  2. `NormalStrategy`: Consumo balanceado estándar (`distancia * 1.0 * (1 + peso * 0.015)`).
+  3. `AltoRendimientoStrategy`: Máxima velocidad (`distancia * 1.5 * (1 + peso * 0.02)`).
+- **Control de Autonomía:** Si el consumo supera el 100% de la capacidad de la batería, el sistema emite una **Alerta Crítica de Batería Insuficiente** y sugiere cambiar de estrategia.
 
-Calcula el porcentaje de batería consumido para una ruta, considerando la distancia geodésica (fórmula de Haversine) y el peso real del dron:
+### 6. Programación y Ejecución de Misiones (Patrón Command)
+- **Desacoplamiento Operacional:** Cada tarea técnica se encapsula en un objeto independiente (`DroneCommand`).
+- **Comandos Disponibles:**
+  1. `TomarFotografiaCommand`: Captura aérea 4K georreferenciada a 120m de altura.
+  2. `EscanearZonaCommand`: Barrido multiespectral (Agricultura) o perimetral térmico LiDAR (Vigilancia).
+  3. `MedirTemperaturaCommand`: Telemetría ambiental y térmica de los motores.
+- **Receptor / Wrapper (`DroneOperacionService`):** Envuelve al dron sin modificar la entidad de dominio `Drone`, ejecutando las operaciones según la especialidad del vehículo.
+- **Invocador (`ProgramadorTareas`):** Encola la secuencia de tareas y las ejecuta en el orden programado mostrando un informe consolidado.
 
-Estrategia	Fórmula
-AhorroStrategy	distancia × 0.5 × (1 + peso × 0.01)
-NormalStrategy	distancia × 1.0 × (1 + peso × 0.015)
-AltoRendimientoStrategy	distancia × 1.5 × (1 + peso × 0.02)
+---
 
-Si el consumo supera el 100 %, el sistema emite una Alerta Crítica de Batería Insuficiente.
+## 🛠️ Tecnologías Utilizadas
 
-5. 🎯 Programación de Misiones — Patrón Command
+- **Lenguaje:** Java 11 / Java 21
+- **Interfaz Gráfica:** JavaFX 13 (`javafx.controls`, `javafx.fxml`)
+- **Base de Datos:** PostgreSQL 42.7.3
+- **Conexión a BD:** JDBC (`java.sql`) con Pool/Singleton
+- **Cliente HTTP:** `java.net.http.HttpClient`
+- **Procesamiento JSON:** Jackson Databind 2.15.2
+- **Gestor de Construcción:** Apache Maven
+- **Estilo Arquitectónico:** Arquitectura Hexagonal (Puertos y Adaptadores)
+- **Patrones de Diseño Implementados:**
+  - *Arquitectónico:* Hexagonal (Ports & Adapters)
+  - *Creacional:* Singleton (Conexión BD), Factory Method (Cadena de validación)
+  - *Comportamiento:* Observer (Suscripción climática), Chain of Responsibility (Viabilidad climática), Strategy (Consumo energético ponderado por peso), Command (Secuencia de tareas de misión)
 
-Permite programar una secuencia de tareas antes de iniciar una misión. Las tareas se encolan en orden y se ejecutan secuencialmente:
+---
 
-Comando	Descripción
-TomarFotografiaCommand	Captura aérea 4K georreferenciada a 120 m de altura
-EscanearZonaCommand	Barrido multiespectral (Agricultura) o perimetral LiDAR térmico (Vigilancia)
-MedirTemperaturaCommand	Telemetría ambiental y térmica de motores
-DroneOperacionService actúa como Receiver / Wrapper del dron sin modificar la entidad de dominio.
-ProgramadorTareas actúa como Invoker, gestionando la cola y ejecutando la misión.
-🏛️ Arquitectura Hexagonal
-╔══════════════════════════════════════════════════════════════════════════════════╗
-║                           ARQUITECTURA HEXAGONAL                                ║
-║                                                                                  ║
-║  ┌──────────────────┐    ┌──────────────────────────────┐    ┌────────────────┐  ║
-║  │ ADAPTADOR ENTRADA│    │       CAPA APLICACIÓN        │    │ ADAPT. SALIDA  │  ║
-║  │                  │    │                              │    │                │  ║
-║  │  DroneView       │──> │  Crear/Listar/Actualizar/    │──> │ PostgresRepo   │  ║
-║  │  DroneController │    │  EliminarDroneServicio       │    │ (PostgreSQL)   │  ║
-║  │                  │    │  ConsultarClimaServicio      │──> │ OpenMeteoAdapt │  ║
-║  │                  │    │  ProgramadorTareas (Invoker) │    │ (HTTP/REST)    │  ║
-║  │                  │    │  DroneOperacionService       │    │ DatabaseConn   │  ║
-║  └──────────────────┘    │  (Receiver/Wrapper)          │    │ (Singleton)    │  ║
-║                           └──────────────────────────────┘    └────────────────┘  ║
-║                                           │                                       ║
-║                                           ▼                                       ║
-║                                NÚCLEO DEL DOMINIO                                 ║
-║   ┌──────────────────────────────────────────────────────────────────────────┐    ║
-║   │ modelo:   Drone · Agricultura · Vigilancia · Piloto · Sensor · Mision   │    ║
-║   │ weather:  Weather · WeatherObserver · WeatherSubject                    │    ║
-║   │ chain:    WeatherHandler · Temp · Hum · Wind · Press · Vis · Factory    │    ║
-║   │ strategy: ConsumoStrategy · Ahorro · Normal · AltoRendimiento · Ruta    │    ║
-║   │ command:  DroneCommand · TomarFoto · EscanearZona · MedirTemperatura    │    ║
-║   └──────────────────────────────────────────────────────────────────────────┘    ║
-╚══════════════════════════════════════════════════════════════════════════════════╝
-Flujo de Interacción
-[DroneView]
-    └──> [DroneController]
-              ├──> [*UseCase] ──> [*Servicio] ──> [DroneRepository] ──> [PostgreSQL]
-              ├──> [ConsultarClimaUseCase]
-              │         └──> [ConsultarClimaServicio]
-              │                    ├──> [WeatherApiClientPort] ──> [OpenMeteoAdapter] ──> (API)
-              │                    ├──> [WeatherHandler (Chain)] ──> [FlightEvaluation]
-              │                    └──> [WeatherSubject] ──> Notifica Observadores
-              └──> [ProgramadorTareas (Invoker)]
-                        └──> [DroneCommand[]] ──> [DroneOperacionService (Receiver)]
-📂 Estructura del Proyecto
+## 🏛️ Arquitectura Hexagonal del Sistema
+
+```text
+ ---------------------------------------------------------------------------------------------------------
+|                                                HEXÁGONO                                                 |
+|                                                                                                         |
+|   ┌────────────────────────┐         ┌───────────────────────────────┐         ┌────────────────────┐   |
+|   │  ADAPTADOR DE ENTRADA  │         │          APLICACIÓN           │         │ADAPTADORES DE SALID│   |
+|   │                        │         │        (Casos de Uso)         │         │                    │   |
+|   │  DroneController.java  │ ------> │  CrearDroneServicio           │ ------> │PostgresDroneRepo   │   |
+|   │  (JavaFX UI:           │         │  ListarDronesServicio         │         │(PostgreSQL BD)     │   |
+|   │   DroneView.java)      │         │  ActualizarDroneServicio      │         ├────────────────────┤   |
+|   │                        │         │  EliminarDroneServicio        │         │OpenMeteoAdapter    │   |
+|   │                        │         │  ConsultarClimaServicio       │ ------> │(Open-Meteo APIs:   │   |
+|   │                        │         │                               │         │ Geocoding + Clima) │   |
+|   └────────────────────────┘         └───────────────────────────────┘         └────────────────────┘   |
+|                                                      │                                                  |
+|                                                      ▼                                                  |
+|                                                   DOMINIO                                               |
+|               Modelos: Drone · Agricultura · Vigilancia · Weather · FlightEvaluation                    |
+|               Patrón Observer: WeatherObserver · WeatherSubject                                         |
+|               Patrón Chain: WeatherHandler · Temp · Hum · Wind · Press · Vis · Factory                 |
+ ---------------------------------------------------------------------------------------------------------
+```
+
+### Flujo de Interacción entre Capas
+
+```
+[UI: DroneView] ──> [DroneController]
+                         │ (invoca puertos de entrada)
+                         ▼
+             [ConsultarClimaUseCase]
+                         │ (implementado por)
+                         ▼
+             [ConsultarClimaServicio]
+                ├──> [WeatherApiClientPort] ──> [OpenMeteoAdapter] ──> (APIs Externas)
+                ├──> [WeatherHandler (Chain)] ──> [FlightEvaluation] (Evalúa 5 condiciones)
+                └──> [WeatherSubject (Observer)] ──> Notifica a Drones Suscritos
+```
+
+---
+
+## 🔌 Adaptadores del Sistema
+
+| Adaptador | Tipo | Puerto que Implementa / Usa | Tecnología / Responsabilidad |
+| :--- | :--- | :--- | :--- |
+| **`DroneController`** | Entrada | Invoca `*UseCase` | Adaptador UI desacoplado de JavaFX; recibe eventos del usuario y delega a la aplicación. |
+| **`DroneView`** | Entrada (Vista) | Usa `DroneController` | Interfaz gráfica JavaFX con tabla, formulario CRUD, controles de suscripción y diálogo emergente. |
+| **`PostgresDroneRepository`**| Salida | `DroneRepository` | Persistencia relacional de drones en base de datos PostgreSQL mediante JDBC y manejo de transacciones. |
+| **`OpenMeteoAdapter`** | Salida | `WeatherApiClientPort` | Cliente HTTP que consume las APIs REST de Open-Meteo (Geocoding + Forecast) y retorna el modelo `Weather`. |
+
+---
+
+## 📂 Estructura Completa del Proyecto
+
+```text
 SW2/
 ├── pom.xml
 ├── README.md
 └── src/
     └── main/
         ├── resources/
-        │   ├── database.properties
-        │   └── ruta.json                              # Rutas de vuelo con coordenadas
+        │   └── database.properties
         └── java/
             ├── module-info.java
+            │
             ├── co/edu/poli/SW2/
-            │   └── App.java                           # Composition Root / Wiring
+            │   └── App.java                                      # Composition Root / Wiring central
+            │
             └── com/drone/
                 ├── dominio/
-                │   ├── modelo/                        # Entidades puras de negocio
-                │   │   ├── Drone.java                 # Entidad abstracta base
+                │   ├── modelo/                                   # Entidades puras de negocio
+                │   │   ├── Drone.java
                 │   │   ├── Agricultura.java
                 │   │   ├── Vigilancia.java
                 │   │   ├── Piloto.java
                 │   │   ├── Sensor.java
                 │   │   └── Mision.java
-                │   ├── weather/                       # Dominio climático
-                │   │   ├── Weather.java
-                │   │   ├── WeatherObserver.java       # Interfaz Observer
-                │   │   ├── WeatherSubject.java        # Sujeto Observable
-                │   │   └── chain/                     # Chain of Responsibility
-                │   │       ├── FlightEvaluation.java
-                │   │       ├── WeatherHandler.java    # Manejador abstracto
-                │   │       ├── TemperatureHandler.java
-                │   │       ├── HumidityHandler.java
-                │   │       ├── WindHandler.java
-                │   │       ├── PressureHandler.java
-                │   │       ├── VisibilityHandler.java
-                │   │       └── WeatherChainFactory.java
-                │   ├── strategy/                      # Patrón Strategy
-                │   │   ├── ConsumoStrategy.java       # Interfaz
-                │   │   ├── AhorroStrategy.java
-                │   │   ├── NormalStrategy.java
-                │   │   ├── AltoRendimientoStrategy.java
-                │   │   ├── PuntoGeografico.java
-                │   │   ├── Ruta.java
-                │   │   └── ResultadoConsumo.java
-                │   └── command/                       # Patrón Command
-                │       ├── DroneCommand.java          # Interfaz de comando
-                │       ├── TomarFotografiaCommand.java
-                │       ├── EscanearZonaCommand.java
-                │       └── MedirTemperaturaCommand.java
+                │   │
+                │   ├── weather/                                  # Dominio climático (Observer y Chain)
+                │   │   ├── Weather.java                          # Modelo con 5 aspectos meteorológicos
+                │   │   ├── WeatherObserver.java                  # Interfaz del observador
+                │   │   ├── WeatherSubject.java                   # Sujeto / Observable en memoria
+                │   │   │
+                │   │   └── chain/                                # Patrón Chain of Responsibility
+                │   │       ├── FlightEvaluation.java             # Objeto de valor con el veredicto
+                │   │       ├── WeatherHandler.java               # Manejador abstracto base
+                │   │       ├── TemperatureHandler.java           # Regla: 0°C a 40°C
+                │   │       ├── HumidityHandler.java              # Regla: <= 85%
+                │   │       ├── WindHandler.java                  # Regla: <= 40 km/h
+                │   │       ├── PressureHandler.java              # Regla: 950 a 1050 hPa
+                │   │       ├── VisibilityHandler.java            # Regla: >= 5 km
+                │   │       └── WeatherChainFactory.java          # Factoría ensambladora de la cadena
+                │   │
+                │   ├── strategy/                                 # Patrón Strategy (Consumo de Batería)
+                │   │   ├── PuntoGeografico.java                  # Coordenadas latitud/longitud y nombre
+                │   │   ├── Ruta.java                             # Origen y destino
+                │   │   ├── ConsumoStrategy.java                  # Interfaz de estrategia ponderada
+                │   │   ├── AhorroStrategy.java                   # Modo ahorro (+1%/kg)
+                │   │   ├── NormalStrategy.java                   # Modo normal (+1.5%/kg)
+                │   │   ├── AltoRendimientoStrategy.java          # Modo alto rendimiento (+2%/kg)
+                │   │   └── ResultadoConsumo.java                 # Veredicto de autonomía
+                │   │
+                │   └── command/                                  # Patrón Command (Tareas de Misión)
+                │       ├── DroneCommand.java                     # Interfaz de comando
+                │       ├── TomarFotografiaCommand.java           # Tarea: Fotografía 4K
+                │       ├── EscanearZonaCommand.java              # Tarea: Escaneo multiespectral/LiDAR
+                │       └── MedirTemperaturaCommand.java          # Tarea: Telemetría térmica
+                │
                 ├── aplicacion/
                 │   ├── puerto/
-                │   │   ├── entrada/                   # Puertos de entrada (Use Cases)
+                │   │   ├── entrada/                              # Interfaces de Casos de Uso
                 │   │   │   ├── CrearDroneUseCase.java
                 │   │   │   ├── ListarDronesUseCase.java
                 │   │   │   ├── ActualizarDroneUseCase.java
                 │   │   │   ├── EliminarDroneUseCase.java
                 │   │   │   └── ConsultarClimaUseCase.java
-                │   │   └── salida/                    # Puertos de salida
+                │   │   │
+                │   │   └── salida/                               # Interfaces hacia el exterior
                 │   │       ├── DroneRepository.java
                 │   │       └── WeatherApiClientPort.java
-                │   ├── servicio/                      # Implementación de casos de uso
+                │   │
+                │   ├── servicio/                                 # Implementación de Casos de Uso
                 │   │   ├── CrearDroneServicio.java
                 │   │   ├── ListarDronesServicio.java
                 │   │   ├── ActualizarDroneServicio.java
                 │   │   ├── EliminarDroneServicio.java
                 │   │   └── ConsultarClimaServicio.java
-                │   ├── service/                       # Servicios del Patrón Command
-                │   │   ├── DroneOperacionService.java # Receiver / Wrapper de Drone
-                │   │   └── ProgramadorTareas.java     # Invoker (cola de tareas)
-                │   ├── usecase/
-                │   │   └── CalcularConsumoUseCase.java # Contexto del Patrón Strategy
+                │   │
+                │   ├── service/                                  # Servicios del Patrón Command
+                │   │   ├── DroneOperacionService.java            # Receptor / Wrapper de Drone
+                │   │   └── ProgramadorTareas.java                # Invocador (Cola de tareas)
+                │   │
+                │   ├── usecase/                                  # Contexto Strategy
+                │   │   └── CalcularConsumoUseCase.java           # Contexto del Patrón Strategy
+                │   │
                 │   └── weather/
-                │       ├── WeatherResultDTO.java
+                │       ├── WeatherResultDTO.java                 # DTO de transferencia global
                 │       └── observer/
-                │           └── DroneWeatherObserver.java
+                │           └── DroneWeatherObserver.java         # Dron adaptado como observador
+                │
                 └── infraestructura/
-                    ├── persistencia/
+                    ├── persistencia/                             # Adaptadores de base de datos
                     │   ├── PostgresDroneRepository.java
-                    │   └── Singleton.java             # Pool de conexión
-                    ├── weather/
+                    │   └── Singleton.java
+                    │
+                    ├── weather/                                  # Adaptadores de APIs externas
                     │   ├── GeoApiClient.java
                     │   ├── OpenMeteoWeatherClient.java
                     │   └── OpenMeteoAdapter.java
-                    ├── loader/
-                    │   └── JsonRutaLoader.java
-                    ├── util/
-                    │   └── HaversineUtil.java         # Distancia geodésica
-                    ├── ui/
-                    │   └── DroneController.java       # Adaptador de entrada
-                    └── vista/
-                        └── DroneView.java             # Interfaz JavaFX
-⚙️ Configuración y Puesta en Marcha
-Prerrequisitos
-JDK 11 o superior instalado y configurado en el PATH.
-PostgreSQL en ejecución.
-Conexión a Internet activa (para consultar las APIs de Open-Meteo).
-Eclipse con soporte para Maven o cualquier IDE compatible.
-1. Configuración de Base de Datos
+                    │
+                    ├── loader/                                   # Carga de archivos JSON
+                    │   └── JsonRutaLoader.java                   # Lector Jackson de ruta.json
+                    │
+                    ├── util/                                     # Algoritmos geográficos
+                    │   └── HaversineUtil.java                    # Distancia geodésica en Km
+                    │
+                    ├── ui/                                       # Adaptador de entrada
+                    │   └── DroneController.java
+                    │
+                    └── vista/                                    # Interfaz de usuario JavaFX
+                        └── DroneView.java
+```
 
-Crea o edita el archivo src/main/resources/database.properties:
+---
 
-properties
+## ⚙️ Configuración y Puesta en Marcha
+
+### 1. Prerrequisitos
+- JDK 11 o superior instalado y configurado en el `PATH`.
+- PostgreSQL en ejecución con la base de datos configurada.
+- Conexión a Internet activa (para consultar las APIs de Open-Meteo).
+
+### 2. Configuración de la Base de Datos
+Crear o verificar el archivo `src/main/resources/database.properties` con las credenciales correspondientes:
+
+```properties
 db.url=jdbc:postgresql://localhost:5432/nombre_de_tu_bd
 db.user=tu_usuario
 db.password=tu_contrasena
+```
 
-Ejecuta el siguiente script SQL en tu base de datos:
+Estructura de tablas requerida en PostgreSQL:
 
-sql
+```sql
 CREATE TABLE IF NOT EXISTS drones (
-    id               VARCHAR(50)    PRIMARY KEY,
-    serial           VARCHAR(100)   UNIQUE NOT NULL,
-    modelo           VARCHAR(100)   NOT NULL,
-    fabricante       VARCHAR(100)   NOT NULL,
-    peso             NUMERIC(10,2)  NOT NULL,
-    tipo             VARCHAR(50)    NOT NULL
+    id VARCHAR(50) PRIMARY KEY,
+    serial VARCHAR(100) UNIQUE NOT NULL,
+    modelo VARCHAR(100) NOT NULL,
+    fabricante VARCHAR(100) NOT NULL,
+    peso NUMERIC(10,2) NOT NULL,
+    tipo VARCHAR(50) NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS drones_agricultura (
-    id_drone         VARCHAR(50)    PRIMARY KEY REFERENCES drones(id) ON DELETE CASCADE,
-    capacidad_tanque NUMERIC(10,2)  NOT NULL
+    id_drone VARCHAR(50) PRIMARY KEY REFERENCES drones(id) ON DELETE CASCADE,
+    capacidad_tanque NUMERIC(10,2) NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS drones_vigilancia (
-    id_drone          VARCHAR(50)    PRIMARY KEY REFERENCES drones(id) ON DELETE CASCADE,
-    deteccion_termica BOOLEAN        NOT NULL
+    id_drone VARCHAR(50) PRIMARY KEY REFERENCES drones(id) ON DELETE CASCADE,
+    deteccion_termica BOOLEAN NOT NULL
 );
-2. Ejecución desde Eclipse
-File → Import → Maven → Existing Maven Projects → seleccionar la carpeta SW2.
-Project → Clean... → limpiar el proyecto.
-Clic derecho en co.edu.poli.SW2.App → Run As → Java Application.
-📖 Guía de Uso
-CRUD de Drones
-Completa el formulario de la izquierda con los datos del dron.
-Selecciona el tipo (Agricultura o Vigilancia) e ingresa el atributo especializado.
-Usa los botones Crear, Actualizar o Eliminar según la operación.
-Haz clic en cualquier fila de la tabla para cargar los datos del dron seleccionado.
-Monitoreo Climático (Observer)
-Selecciona un dron de la tabla.
-Presiona Suscribir para añadirlo al sistema de alertas.
-La etiqueta inferior mostrará: Drones suscritos (N): ID-001, ID-002...
-Selecciona un dron suscrito y presiona Desuscribir para retirarlo.
-Consulta y Evaluación de Vuelo (Chain of Responsibility)
-Selecciona una ciudad en el menú desplegable.
-Presiona Consultar Clima y Evaluar Vuelo.
-Un pop-up mostrará:
-Condiciones meteorológicas actuales (temperatura, humedad, viento, presión, visibilidad).
-Veredicto: ✅ CLIMA APTO o ❌ CLIMA NO APTO con la regla exacta incumplida.
-Notificación al listado de drones suscritos.
-Estimación de Consumo (Strategy)
-Selecciona un dron de la tabla (se usará su peso automáticamente).
-Elige la ruta de vuelo del desplegable.
-Selecciona el modo de vuelo: Ahorro, Normal o Alto Rendimiento.
-Presiona Calcular Consumo.
-El pop-up mostrará la distancia, consumo estimado y autonomía disponible.
+```
 
-⚠️ Si la batería es insuficiente en modo Alto Rendimiento, el sistema lo indicará como misión inviable.
+### 3. Ejecución desde Eclipse o IDE
+1. Importar el proyecto como **Existing Maven Project**.
+2. Realizar **Project -> Clean...**.
+3. Ejecutar la clase principal: `co.edu.poli.SW2.App.java` como **Java Application**.
 
-Programación de Misión (Command)
-Selecciona un dron de la tabla.
-En la sección "Programación de Misión", presiona los botones para encolar tareas:
-+ Foto → agrega TomarFotografiaCommand
-+ Escaneo → agrega EscanearZonaCommand
-+ Temperatura → agrega MedirTemperaturaCommand
-La etiqueta de secuencia se actualiza en tiempo real: [1. Tomar Fotografía] ➔ [2. Escanear Zona] ➔ ...
-Presiona 🚀 Ejecutar Misión para ejecutar todas las tareas en orden y ver el reporte consolidado.
-Usa Limpiar para reiniciar la cola de tareas.
-🧩 Diagramas UML
-Diagrama del Dominio
-plantuml
-@startuml
-package "com.drone.dominio" {
-    package "modelo" {
-        abstract class Drone
-        class Agricultura
-        class Vigilancia
-        Drone <|-- Agricultura
-        Drone <|-- Vigilancia
-    }
-    package "command" {
-        interface DroneCommand
-        class TomarFotografiaCommand
-        class EscanearZonaCommand
-        class MedirTemperaturaCommand
-        DroneCommand <|.. TomarFotografiaCommand
-        DroneCommand <|.. EscanearZonaCommand
-        DroneCommand <|.. MedirTemperaturaCommand
-    }
-    package "strategy" {
-        interface ConsumoStrategy
-        class AhorroStrategy
-        class NormalStrategy
-        class AltoRendimientoStrategy
-        ConsumoStrategy <|.. AhorroStrategy
-        ConsumoStrategy <|.. NormalStrategy
-        ConsumoStrategy <|.. AltoRendimientoStrategy
-    }
-    package "weather" {
-        class Weather
-        interface WeatherObserver
-        class WeatherSubject
-        WeatherSubject --> "*" WeatherObserver
-    }
-    package "weather.chain" {
-        abstract class WeatherHandler
-        class FlightEvaluation
-        WeatherHandler --> FlightEvaluation
-    }
-}
-@enduml
-Diagrama de Arquitectura
-plantuml
-@startuml
-package "Dominio" {
-    abstract class Drone
-    interface DroneCommand
-    interface ConsumoStrategy
-    class Weather
-}
-package "Aplicacion" {
-    interface CrearDroneUseCase
-    interface DroneRepository
-    class ProgramadorTareas
-    class DroneOperacionService
-    class ConsultarClimaServicio
-}
-package "Infraestructura.Entrada" {
-    class DroneController
-    class DroneView
-}
-package "Infraestructura.Salida" {
-    class PostgresDroneRepository
-    class OpenMeteoAdapter
-}
-DroneView --> DroneController
-DroneController --> CrearDroneUseCase
-DroneController --> ProgramadorTareas
-ProgramadorTareas --> DroneCommand
-DroneOperacionService --> Drone
-DroneRepository <|-- PostgresDroneRepository
-@enduml
-👥 Autores
-Nombre	Programa	Universidad
-(Tu nombre aquí)	Ingeniería de Sistemas	Politécnico Colombiano Jaime Isaza Cadavid
-📄 Licencia
+---
 
-Este proyecto es de uso académico y fue desarrollado para el curso Ingeniería de Software II — Polítécnico Colombiano Jaime Isaza Cadavid.
+## 📖 Guía de Uso de la Aplicación
+
+1. **Gestión CRUD:**
+   - Diligencia los datos en el formulario izquierdo y presiona **Crear**.
+   - Haz clic en cualquier dron de la tabla para cargar sus datos en el formulario y utilizar **Actualizar** o **Eliminar**.
+2. **Monitoreo Climático (Observer):**
+   - Selecciona un dron de la tabla y haz clic en **Suscribir**.
+   - La etiqueta inferior mostrará los drones suscritos: `Drones suscritos (1): D-001`.
+   - Para quitarlo de la lista, selecciónalo y presiona **Desuscribir**.
+3. **Consulta y Evaluación de Vuelo (Chain of Responsibility):**
+   - Selecciona la ciudad en el menú desplegable (`Bogota` o `Brujas`).
+   - Presiona **Consultar Clima y Evaluar Vuelo**.
+   - Se abrirá una ventana emergente detallando:
+     - Aspectos meteorológicos actuales (temperatura, humedad, viento, presión y visibilidad).
+     - Veredicto de viabilidad: `CLIMA APTO` o `CLIMA NO APTO` (indicando la regla incumplida).
+     - Estado de autorización para la flota de drones suscritos.
