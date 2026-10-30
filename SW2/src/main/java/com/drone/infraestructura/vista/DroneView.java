@@ -1,12 +1,20 @@
 package com.drone.infraestructura.vista;
 
 import com.drone.aplicacion.weather.WeatherResultDTO;
+import com.drone.dominio.command.DroneCommand;
 import com.drone.dominio.modelo.Agricultura;
 import com.drone.dominio.modelo.Drone;
 import com.drone.dominio.modelo.Vigilancia;
+import com.drone.dominio.strategy.AhorroStrategy;
+import com.drone.dominio.strategy.AltoRendimientoStrategy;
+import com.drone.dominio.strategy.ConsumoStrategy;
+import com.drone.dominio.strategy.NormalStrategy;
+import com.drone.dominio.strategy.ResultadoConsumo;
+import com.drone.dominio.strategy.Ruta;
 import com.drone.dominio.weather.Weather;
 import com.drone.dominio.weather.chain.FlightEvaluation;
 import com.drone.infraestructura.ui.DroneController;
+import java.util.ArrayList;
 import java.util.List;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -25,7 +33,7 @@ public class DroneView extends HBox {
     private final TableView<Drone> table;
     private final ObservableList<Drone> droneData;
 
-    // Campos del formulario
+    // Campos del formulario CRUD
     private TextField idField;
     private ComboBox<String> tipoCombo;
     private TextField serialField;
@@ -49,6 +57,14 @@ public class DroneView extends HBox {
     private ComboBox<String> ciudadCombo;
     private Button btnConsultarClima;
 
+    // Componentes Patrón Strategy
+    private ComboBox<Ruta> rutaCombo;
+    private ComboBox<ConsumoStrategy> strategyCombo;
+    private Button btnCalcularConsumo;
+
+    // Componentes Patrón Command
+    private Label lblSecuenciaMision;
+
     public DroneView(DroneController controller) {
         this.controller = controller;
         this.droneData = FXCollections.observableArrayList();
@@ -60,18 +76,24 @@ public class DroneView extends HBox {
         VBox formBox = createFormBox();
         VBox tableBox = createTableBox();
 
-        getChildren().addAll(formBox, tableBox);
+        ScrollPane scrollPane = new ScrollPane(formBox);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        scrollPane.setPrefWidth(380);
+
+        getChildren().addAll(scrollPane, tableBox);
         HBox.setHgrow(tableBox, Priority.ALWAYS);
 
         refreshTable();
         actualizarLabelSuscritos();
+        cargarRutasEnCombo();
     }
 
     private VBox createFormBox() {
         VBox vbox = new VBox(10);
         vbox.setPadding(new Insets(10));
         vbox.setStyle("-fx-border-color: #ccc; -fx-border-width: 1; -fx-border-radius: 5;");
-        vbox.setPrefWidth(360);
+        vbox.setPrefWidth(350);
 
         Label title = new Label("Gestión de Drones - Arquitectura Hexagonal");
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
@@ -121,7 +143,7 @@ public class DroneView extends HBox {
 
         btnBox.getChildren().addAll(btnCreate, btnUpdate, btnDelete, btnClear);
 
-        // ── SECCIÓN INFERIOR IZQUIERDA: OBSERVER & CHAIN OF RESPONSIBILITY ──
+        // ── SECCIÓN: OBSERVER & CHAIN OF RESPONSIBILITY ──
         VBox weatherBox = new VBox(8);
         weatherBox.setPadding(new Insets(10));
         weatherBox.setStyle("-fx-border-color: #007acc; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-color: #f7faff;");
@@ -147,7 +169,6 @@ public class DroneView extends HBox {
         btnSuscribir.setOnAction(e -> suscribirDroneSeleccionado());
         btnDesuscribir.setOnAction(e -> desuscribirDroneSeleccionado());
 
-        // Selector de Ciudad y Evaluación de Vuelo
         Label cityLabel = new Label("2. Seleccione la ciudad de operación:");
         cityLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
 
@@ -171,7 +192,104 @@ public class DroneView extends HBox {
                 btnConsultarClima
         );
 
-        vbox.getChildren().addAll(title, grid, new Separator(), btnBox, new Separator(), weatherBox);
+        // ── SECCIÓN: PATRÓN STRATEGY (ESTIMACIÓN DE BATERÍA POR RUTA) ──
+        VBox strategyBox = new VBox(8);
+        strategyBox.setPadding(new Insets(10));
+        strategyBox.setStyle("-fx-border-color: #ff8c00; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-color: #fffbf5;");
+
+        Label strategyTitle = new Label("Estimación de Batería (Patrón Strategy)");
+        strategyTitle.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #c75b00;");
+
+        Label strategyHelp = new Label("Seleccione un dron en la tabla, una ruta y la estrategia de consumo:");
+        strategyHelp.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+        strategyHelp.setWrapText(true);
+
+        Label rutaLabel = new Label("1. Ruta de Vuelo (JSON):");
+        rutaLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+
+        rutaCombo = new ComboBox<>();
+        rutaCombo.setMaxWidth(Double.MAX_VALUE);
+
+        Label modoLabel = new Label("2. Estrategia de Consumo Energético:");
+        modoLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+
+        strategyCombo = new ComboBox<>(FXCollections.observableArrayList(
+                new AhorroStrategy(),
+                new NormalStrategy(),
+                new AltoRendimientoStrategy()
+        ));
+        strategyCombo.setValue(strategyCombo.getItems().get(0));
+        strategyCombo.setMaxWidth(Double.MAX_VALUE);
+
+        btnCalcularConsumo = new Button("Calcular Consumo de Ruta");
+        btnCalcularConsumo.setMaxWidth(Double.MAX_VALUE);
+        btnCalcularConsumo.setStyle("-fx-background-color: #ff8c00; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnCalcularConsumo.setOnAction(e -> calcularConsumoRuta());
+
+        strategyBox.getChildren().addAll(
+                strategyTitle,
+                strategyHelp,
+                rutaLabel,
+                rutaCombo,
+                modoLabel,
+                strategyCombo,
+                btnCalcularConsumo
+        );
+
+        // ── SECCIÓN: PATRÓN COMMAND (PROGRAMACIÓN Y EJECUCIÓN DE MISIÓN) ──
+        VBox commandBox = new VBox(8);
+        commandBox.setPadding(new Insets(10));
+        commandBox.setStyle("-fx-border-color: #6f42c1; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-color: #fbf9fe;");
+
+        Label commandTitle = new Label("Programación de Misión (Patrón Command)");
+        commandTitle.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #4e228c;");
+
+        Label commandHelp = new Label("Seleccione un dron y arme la secuencia de tareas a ejecutar en orden:");
+        commandHelp.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+        commandHelp.setWrapText(true);
+
+        HBox cmdBtnBox = new HBox(6);
+        Button btnCmdFoto = new Button("+ Foto");
+        btnCmdFoto.setStyle("-fx-background-color: #6f42c1; -fx-text-fill: white; -fx-font-size: 11px; -fx-cursor: hand;");
+        Button btnCmdEscaneo = new Button("+ Escaneo");
+        btnCmdEscaneo.setStyle("-fx-background-color: #6f42c1; -fx-text-fill: white; -fx-font-size: 11px; -fx-cursor: hand;");
+        Button btnCmdTemp = new Button("+ Temperatura");
+        btnCmdTemp.setStyle("-fx-background-color: #6f42c1; -fx-text-fill: white; -fx-font-size: 11px; -fx-cursor: hand;");
+        cmdBtnBox.getChildren().addAll(btnCmdFoto, btnCmdEscaneo, btnCmdTemp);
+
+        lblSecuenciaMision = new Label("Secuencia programada (0): [Ninguna tarea]");
+        lblSecuenciaMision.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #333;");
+        lblSecuenciaMision.setWrapText(true);
+
+        HBox actionCmdBox = new HBox(10);
+        Button btnLimpiarMision = new Button("Limpiar");
+        btnLimpiarMision.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        Button btnEjecutarMision = new Button("Ejecutar Misión");
+        btnEjecutarMision.setMaxWidth(Double.MAX_VALUE);
+        btnEjecutarMision.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        HBox.setHgrow(btnEjecutarMision, Priority.ALWAYS);
+        actionCmdBox.getChildren().addAll(btnLimpiarMision, btnEjecutarMision);
+
+        btnCmdFoto.setOnAction(e -> encolarTarea("FOTO"));
+        btnCmdEscaneo.setOnAction(e -> encolarTarea("ESCANEO"));
+        btnCmdTemp.setOnAction(e -> encolarTarea("TEMPERATURA"));
+        btnLimpiarMision.setOnAction(e -> limpiarMision());
+        btnEjecutarMision.setOnAction(e -> ejecutarMisionProgramada());
+
+        commandBox.getChildren().addAll(
+                commandTitle,
+                commandHelp,
+                cmdBtnBox,
+                lblSecuenciaMision,
+                actionCmdBox
+        );
+
+        vbox.getChildren().addAll(
+                title, grid, new Separator(), btnBox,
+                new Separator(), weatherBox,
+                new Separator(), strategyBox,
+                new Separator(), commandBox
+        );
         return vbox;
     }
 
@@ -292,13 +410,11 @@ public class DroneView extends HBox {
         }
 
         try {
-            // Invoca UseCase: APIs Open-Meteo -> Chain of Responsibility -> Observer notification
             WeatherResultDTO resultado = controller.consultarYEvaluarClima(ciudad);
             Weather w = resultado.getWeather();
             FlightEvaluation eval = resultado.getEvaluation();
             List<String> suscritos = resultado.getDronesNotificados();
 
-            // Construcción del mensaje para la ventana emergente (Pop-up)
             StringBuilder sb = new StringBuilder();
             sb.append("📍 CIUDAD CONSULTADA: ").append(w.getCiudad()).append("\n\n");
             sb.append("🌤️ CONDICIONES METEOROLÓGICAS ACTUALES (Open-Meteo):\n");
@@ -346,6 +462,168 @@ public class DroneView extends HBox {
         }
     }
 
+    // ── ESTIMACIÓN DE BATERÍA (PATRÓN STRATEGY) ───────────────────────────
+
+    private void cargarRutasEnCombo() {
+        try {
+            List<Ruta> rutas = controller.obtenerRutasDisponibles();
+            rutaCombo.setItems(FXCollections.observableArrayList(rutas));
+            if (!rutas.isEmpty()) {
+                rutaCombo.setValue(rutas.get(0));
+            }
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.WARNING, "Advertencia", "No se pudieron cargar las rutas del JSON: " + e.getMessage());
+        }
+    }
+
+    private void calcularConsumoRuta() {
+        Drone selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención", "Por favor seleccione un dron de la tabla para calcular la estimación.");
+            return;
+        }
+
+        Ruta ruta = rutaCombo.getValue();
+        if (ruta == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención", "Por favor seleccione una ruta de vuelo.");
+            return;
+        }
+
+        ConsumoStrategy strategy = strategyCombo.getValue();
+        if (strategy == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención", "Por favor seleccione una estrategia de consumo energético.");
+            return;
+        }
+
+        try {
+            ResultadoConsumo res = controller.calcularConsumo(selected, ruta, strategy);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("🚁 DRON: %s (%s) | Peso: %.1f kg\n",
+                    res.getDrone().getId(), res.getDrone().getModelo(), res.getDrone().getPeso()));
+            sb.append(String.format("📍 MISIÓN: %s (%.1f km)\n",
+                    res.getRuta().getNombre(), res.getDistanciaKm()));
+            sb.append(String.format("   • Origen:  %s\n", res.getRuta().getOrigen().getNombre()));
+            sb.append(String.format("   • Destino: %s\n\n", res.getRuta().getDestino().getNombre()));
+
+            sb.append("⚡ ESTRATEGIA DE CONSUMO:\n");
+            sb.append(String.format("   • Modo:    %s\n", res.getEstrategiaNombre()));
+            sb.append(String.format("   • Batería: %.1f%% requerida (Límite: 100%%)\n\n", res.getPorcentajeConsumo()));
+
+            sb.append("⚖️ EVALUACIÓN OPERACIONAL:\n");
+            if (res.isEsViable()) {
+                double restante = 100.0 - res.getPorcentajeConsumo();
+                sb.append(String.format("   ✅ Vuelo Viable. Batería restante al llegar: %.1f%%\n", restante));
+            } else {
+                double faltante = res.getPorcentajeConsumo() - 100.0;
+                sb.append(String.format("   ❌ No Viable. Falta %.1f%% de batería para completar la ruta.\n", faltante));
+                sb.append("   ⚠️ Acción sugerida: Reducir la carga.\n");
+            }
+
+            Alert.AlertType alertType = res.isEsViable() ? Alert.AlertType.INFORMATION : Alert.AlertType.WARNING;
+            String header = res.isEsViable()
+                    ? "VUELO VIABLE: BATERÍA SUFICIENTE"
+                    : "ALERTA CRÍTICA: BATERÍA INSUFICIENTE";
+
+            Alert alert = new Alert(alertType);
+            alert.setTitle("Estimación de Batería (Patrón Strategy)");
+            alert.setHeaderText(header);
+            alert.setContentText(sb.toString());
+            alert.getDialogPane().setPrefWidth(500);
+            alert.showAndWait();
+
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Error de Cálculo", "No se pudo realizar el cálculo de consumo: " + e.getMessage());
+        }
+    }
+
+    // ── GESTIÓN PATRÓN COMMAND (SECUENCIA DE TAREAS / MISIÓN) ───────────────
+
+    private void encolarTarea(String tipo) {
+        Drone selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención", "Por favor seleccione un dron en la tabla para asignarle la tarea.");
+            return;
+        }
+
+        switch (tipo) {
+            case "FOTO":
+                controller.agregarTareaFotografia(selected);
+                break;
+            case "ESCANEO":
+                controller.agregarTareaEscaneo(selected);
+                break;
+            case "TEMPERATURA":
+                controller.agregarTareaTemperatura(selected);
+                break;
+        }
+        actualizarLabelSecuencia();
+    }
+
+    private void limpiarMision() {
+        controller.limpiarTareasMision();
+        actualizarLabelSecuencia();
+    }
+
+    private void actualizarLabelSecuencia() {
+        List<DroneCommand> tareas = controller.getTareasMision();
+        if (tareas.isEmpty()) {
+            lblSecuenciaMision.setText("Secuencia programada (0): [Ninguna tarea]");
+        } else {
+            List<String> nombres = new ArrayList<>();
+            for (int i = 0; i < tareas.size(); i++) {
+                nombres.add((i + 1) + ". " + tareas.get(i).getNombre());
+            }
+            lblSecuenciaMision.setText(String.format("Secuencia programada (%d):\n%s",
+                    tareas.size(), String.join(" ➔ ", nombres)));
+        }
+    }
+
+    private void ejecutarMisionProgramada() {
+        Drone selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención", "Por favor seleccione el dron asignado para ejecutar la misión.");
+            return;
+        }
+
+        if (controller.getTareasMision().isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Secuencia Vacía", "Agregue al menos una tarea a la secuencia antes de ejecutar.");
+            return;
+        }
+
+        try {
+            int totalTareas = controller.getTareasMision().size();
+            List<String> reporte = controller.ejecutarMision();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("🚁 DRON OPERADOR: %s (%s)\n", selected.getId(), selected.getModelo()));
+            sb.append(String.format("   • Especialidad: %s | Peso: %.1f kg\n\n",
+                    (selected instanceof Agricultura ? "Agricultura" : "Vigilancia"), selected.getPeso()));
+            sb.append(String.format("📋 TAREAS EJECUTADAS EN SECUENCIA: %d\n", totalTareas));
+            sb.append("───────────────────────────────────────────────\n\n");
+
+            for (String paso : reporte) {
+                sb.append(paso).append("\n\n");
+            }
+
+            sb.append("───────────────────────────────────────────────\n");
+            sb.append("✅ ESTADO: Misión completada exitosamente en orden.");
+
+            controller.limpiarTareasMision();
+            actualizarLabelSecuencia();
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Reporte de Misión (Patrón Command)");
+            alert.setHeaderText("MISIÓN COMPLETADA - SECUENCIA DE TAREAS EJECUTADA");
+            alert.setContentText(sb.toString());
+            alert.getDialogPane().setPrefWidth(560);
+            alert.showAndWait();
+
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Error en Misión", "Ocurrió un error al ejecutar la secuencia: " + e.getMessage());
+        }
+    }
+
     // ── CRUD ───────────────────────────────────────────────────────────────
 
     private void crearDrone() {
@@ -380,7 +658,6 @@ public class DroneView extends HBox {
         }
         try {
             controller.deleteDrone(selected.getId());
-            // Si estaba suscrito, removerlo de la lista de observadores
             controller.desuscribirDrone(selected.getId());
             actualizarLabelSuscritos();
 

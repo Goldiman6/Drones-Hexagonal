@@ -29,6 +29,24 @@ Aplicación para la gestión de vehículos aéreos no tripulados (Drones), desar
 - **API de Geocodificación (Open-Meteo):** Convierte el nombre de la ciudad seleccionada (`Bogota` o `Brujas`) en coordenadas geográficas (`latitud` y `longitud`).
 - **API de Pronóstico / Clima Actual (Open-Meteo):** Consulta en tiempo real los 5 aspectos meteorológicos clave mediante peticiones HTTP asíncronas con Java 11 `HttpClient` y parseo JSON con Jackson.
 
+### 5. Estimación de Consumo Energético por Ruta (Patrón Strategy Ponderado por Peso)
+- **Carga de Rutas JSON:** Lee rutas de vuelo con puntos geográficos de origen y destino (`ruta.json`).
+- **Cálculo Geodésico (Haversine):** Traduce las coordenadas de latitud y longitud a distancia real en kilómetros.
+- **Estrategias Polimórficas Afectadas por el Peso:**
+  1. `AhorroStrategy`: Minimiza el consumo (`distancia * 0.5 * (1 + peso * 0.01)`).
+  2. `NormalStrategy`: Consumo balanceado estándar (`distancia * 1.0 * (1 + peso * 0.015)`).
+  3. `AltoRendimientoStrategy`: Máxima velocidad (`distancia * 1.5 * (1 + peso * 0.02)`).
+- **Control de Autonomía:** Si el consumo supera el 100% de la capacidad de la batería, el sistema emite una **Alerta Crítica de Batería Insuficiente** y sugiere cambiar de estrategia.
+
+### 6. Programación y Ejecución de Misiones (Patrón Command)
+- **Desacoplamiento Operacional:** Cada tarea técnica se encapsula en un objeto independiente (`DroneCommand`).
+- **Comandos Disponibles:**
+  1. `TomarFotografiaCommand`: Captura aérea 4K georreferenciada a 120m de altura.
+  2. `EscanearZonaCommand`: Barrido multiespectral (Agricultura) o perimetral térmico LiDAR (Vigilancia).
+  3. `MedirTemperaturaCommand`: Telemetría ambiental y térmica de los motores.
+- **Receptor / Wrapper (`DroneOperacionService`):** Envuelve al dron sin modificar la entidad de dominio `Drone`, ejecutando las operaciones según la especialidad del vehículo.
+- **Invocador (`ProgramadorTareas`):** Encola la secuencia de tareas y las ejecuta en el orden programado mostrando un informe consolidado.
+
 ---
 
 ## 🛠️ Tecnologías Utilizadas
@@ -44,7 +62,7 @@ Aplicación para la gestión de vehículos aéreos no tripulados (Drones), desar
 - **Patrones de Diseño Implementados:**
   - *Arquitectónico:* Hexagonal (Ports & Adapters)
   - *Creacional:* Singleton (Conexión BD), Factory Method (Cadena de validación)
-  - *Comportamiento:* Observer (Suscripción climática), Chain of Responsibility (Viabilidad de vuelo)
+  - *Comportamiento:* Observer (Suscripción climática), Chain of Responsibility (Viabilidad climática), Strategy (Consumo energético ponderado por peso), Command (Secuencia de tareas de misión)
 
 ---
 
@@ -127,20 +145,35 @@ SW2/
                 │   │   ├── Sensor.java
                 │   │   └── Mision.java
                 │   │
-                │   └── weather/                                  # Dominio climático y patrones
-                │       ├── Weather.java                          # Modelo con 5 aspectos meteorológicos
-                │       ├── WeatherObserver.java                  # Interfaz del observador
-                │       ├── WeatherSubject.java                   # Sujeto / Observable en memoria
-                │       │
-                │       └── chain/                                # Patrón Chain of Responsibility
-                │           ├── FlightEvaluation.java             # Objeto de valor con el veredicto
-                │           ├── WeatherHandler.java               # Manejador abstracto base
-                │           ├── TemperatureHandler.java           # Regla: 0°C a 40°C
-                │           ├── HumidityHandler.java              # Regla: <= 85%
-                │           ├── WindHandler.java                  # Regla: <= 40 km/h
-                │           ├── PressureHandler.java              # Regla: 950 a 1050 hPa
-                │           ├── VisibilityHandler.java            # Regla: >= 5 km
-                │           └── WeatherChainFactory.java          # Factoría ensambladora de la cadena
+                │   ├── weather/                                  # Dominio climático (Observer y Chain)
+                │   │   ├── Weather.java                          # Modelo con 5 aspectos meteorológicos
+                │   │   ├── WeatherObserver.java                  # Interfaz del observador
+                │   │   ├── WeatherSubject.java                   # Sujeto / Observable en memoria
+                │   │   │
+                │   │   └── chain/                                # Patrón Chain of Responsibility
+                │   │       ├── FlightEvaluation.java             # Objeto de valor con el veredicto
+                │   │       ├── WeatherHandler.java               # Manejador abstracto base
+                │   │       ├── TemperatureHandler.java           # Regla: 0°C a 40°C
+                │   │       ├── HumidityHandler.java              # Regla: <= 85%
+                │   │       ├── WindHandler.java                  # Regla: <= 40 km/h
+                │   │       ├── PressureHandler.java              # Regla: 950 a 1050 hPa
+                │   │       ├── VisibilityHandler.java            # Regla: >= 5 km
+                │   │       └── WeatherChainFactory.java          # Factoría ensambladora de la cadena
+                │   │
+                │   ├── strategy/                                 # Patrón Strategy (Consumo de Batería)
+                │   │   ├── PuntoGeografico.java                  # Coordenadas latitud/longitud y nombre
+                │   │   ├── Ruta.java                             # Origen y destino
+                │   │   ├── ConsumoStrategy.java                  # Interfaz de estrategia ponderada
+                │   │   ├── AhorroStrategy.java                   # Modo ahorro (+1%/kg)
+                │   │   ├── NormalStrategy.java                   # Modo normal (+1.5%/kg)
+                │   │   ├── AltoRendimientoStrategy.java          # Modo alto rendimiento (+2%/kg)
+                │   │   └── ResultadoConsumo.java                 # Veredicto de autonomía
+                │   │
+                │   └── command/                                  # Patrón Command (Tareas de Misión)
+                │       ├── DroneCommand.java                     # Interfaz de comando
+                │       ├── TomarFotografiaCommand.java           # Tarea: Fotografía 4K
+                │       ├── EscanearZonaCommand.java              # Tarea: Escaneo multiespectral/LiDAR
+                │       └── MedirTemperaturaCommand.java          # Tarea: Telemetría térmica
                 │
                 ├── aplicacion/
                 │   ├── puerto/
@@ -162,6 +195,13 @@ SW2/
                 │   │   ├── EliminarDroneServicio.java
                 │   │   └── ConsultarClimaServicio.java
                 │   │
+                │   ├── service/                                  # Servicios del Patrón Command
+                │   │   ├── DroneOperacionService.java            # Receptor / Wrapper de Drone
+                │   │   └── ProgramadorTareas.java                # Invocador (Cola de tareas)
+                │   │
+                │   ├── usecase/                                  # Contexto Strategy
+                │   │   └── CalcularConsumoUseCase.java           # Contexto del Patrón Strategy
+                │   │
                 │   └── weather/
                 │       ├── WeatherResultDTO.java                 # DTO de transferencia global
                 │       └── observer/
@@ -176,6 +216,12 @@ SW2/
                     │   ├── GeoApiClient.java
                     │   ├── OpenMeteoWeatherClient.java
                     │   └── OpenMeteoAdapter.java
+                    │
+                    ├── loader/                                   # Carga de archivos JSON
+                    │   └── JsonRutaLoader.java                   # Lector Jackson de ruta.json
+                    │
+                    ├── util/                                     # Algoritmos geográficos
+                    │   └── HaversineUtil.java                    # Distancia geodésica en Km
                     │
                     ├── ui/                                       # Adaptador de entrada
                     │   └── DroneController.java

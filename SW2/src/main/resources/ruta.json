@@ -1,0 +1,32 @@
+{
+  "rutas": [
+    {
+      "id": "RUTA-01",
+      "nombre": "Mision Corta: Bogota a Chia",
+      "origen": {
+        "nombre": "Base Central de Operaciones (Bogota)",
+        "latitud": 4.60971,
+        "longitud": -74.08175
+      },
+      "destino": {
+        "nombre": "Zona Agricola / Vigilancia (Chia)",
+        "latitud": 4.86139,
+        "longitud": -74.05861
+      }
+    },
+    {
+      "id": "RUTA-02",
+      "nombre": "Mision Larga: Bogota a Villavicencio",
+      "origen": {
+        "nombre": "Base Central de Operaciones (Bogota)",
+        "latitud": 4.60971,
+        "longitud": -74.08175
+      },
+      "destino": {
+        "nombre": "Estacion de Enlace Los Llanos (Villavicencio)",
+        "latitud": 4.14200,
+        "longitud": -73.62664
+      }
+    }
+  ]
+}
