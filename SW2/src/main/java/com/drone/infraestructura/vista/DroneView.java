@@ -5,6 +5,8 @@ import com.drone.dominio.command.DroneCommand;
 import com.drone.dominio.modelo.Agricultura;
 import com.drone.dominio.modelo.Drone;
 import com.drone.dominio.modelo.Vigilancia;
+import com.drone.dominio.state.DroneState;
+import com.drone.dominio.state.DroneWrapper;
 import com.drone.dominio.strategy.AhorroStrategy;
 import com.drone.dominio.strategy.AltoRendimientoStrategy;
 import com.drone.dominio.strategy.ConsumoStrategy;
@@ -64,6 +66,14 @@ public class DroneView extends HBox {
 
     // Componentes Patrón Command
     private Label lblSecuenciaMision;
+
+    // Componentes Patrón State
+    private Label lblEstadoActual;
+    private Button btnEncender;
+    private Button btnApagar;
+    private Button btnDespegar;
+    private Button btnIniciarAterrizaje;
+    private Button btnFinalizarAterrizaje;
 
     public DroneView(DroneController controller) {
         this.controller = controller;
@@ -284,11 +294,82 @@ public class DroneView extends HBox {
                 actionCmdBox
         );
 
+        // ── SECCIÓN: PATRÓN STATE (CONTROL DE ESTADOS OPERATIVOS) ──
+        VBox stateBox = new VBox(8);
+        stateBox.setPadding(new Insets(10));
+        stateBox.setStyle("-fx-border-color: #1a6e3c; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-color: #f4fdf7;");
+
+        Label stateTitle = new Label("Control de Estado Operativo (Patrón State)");
+        stateTitle.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #145a32;");
+
+        Label stateHelp = new Label("Seleccione un dron en la tabla para gestionar su ciclo operativo:");
+        stateHelp.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+        stateHelp.setWrapText(true);
+
+        lblEstadoActual = new Label("Estado actual: [Ningún dron seleccionado]");
+        lblEstadoActual.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #145a32;");
+
+        // Fila 1: Encender / Apagar
+        HBox stateRow1 = new HBox(8);
+        btnEncender = new Button("⚡ Encender");
+        btnEncender.setMaxWidth(Double.MAX_VALUE);
+        btnEncender.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnEncender.setDisable(true);
+
+        btnApagar = new Button("⛔ Apagar");
+        btnApagar.setMaxWidth(Double.MAX_VALUE);
+        btnApagar.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnApagar.setDisable(true);
+
+        HBox.setHgrow(btnEncender, Priority.ALWAYS);
+        HBox.setHgrow(btnApagar, Priority.ALWAYS);
+        stateRow1.getChildren().addAll(btnEncender, btnApagar);
+
+        // Fila 2: Despegar
+        btnDespegar = new Button("🚀 Despegar");
+        btnDespegar.setMaxWidth(Double.MAX_VALUE);
+        btnDespegar.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnDespegar.setDisable(true);
+
+        // Fila 3: Aterrizaje (Iniciar y Finalizar)
+        HBox stateRow3 = new HBox(8);
+        btnIniciarAterrizaje = new Button("🛬 Iniciar Aterrizaje");
+        btnIniciarAterrizaje.setMaxWidth(Double.MAX_VALUE);
+        btnIniciarAterrizaje.setStyle("-fx-background-color: #fd7e14; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnIniciarAterrizaje.setDisable(true);
+
+        btnFinalizarAterrizaje = new Button("✅ Finalizar Aterrizaje");
+        btnFinalizarAterrizaje.setMaxWidth(Double.MAX_VALUE);
+        btnFinalizarAterrizaje.setStyle("-fx-background-color: #17a2b8; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnFinalizarAterrizaje.setDisable(true);
+
+        HBox.setHgrow(btnIniciarAterrizaje, Priority.ALWAYS);
+        HBox.setHgrow(btnFinalizarAterrizaje, Priority.ALWAYS);
+        stateRow3.getChildren().addAll(btnIniciarAterrizaje, btnFinalizarAterrizaje);
+
+        // Acciones de los botones
+        btnEncender.setOnAction(e -> ejecutarTransicionEstado("ENCENDER"));
+        btnApagar.setOnAction(e -> ejecutarTransicionEstado("APAGAR"));
+        btnDespegar.setOnAction(e -> ejecutarTransicionEstado("DESPEGAR"));
+        btnIniciarAterrizaje.setOnAction(e -> ejecutarTransicionEstado("INICIAR_ATERRIZAJE"));
+        btnFinalizarAterrizaje.setOnAction(e -> ejecutarTransicionEstado("FINALIZAR_ATERRIZAJE"));
+
+        stateBox.getChildren().addAll(
+                stateTitle,
+                stateHelp,
+                lblEstadoActual,
+                new Separator(),
+                stateRow1,
+                btnDespegar,
+                stateRow3
+        );
+
         vbox.getChildren().addAll(
                 title, grid, new Separator(), btnBox,
                 new Separator(), weatherBox,
                 new Separator(), strategyBox,
-                new Separator(), commandBox
+                new Separator(), commandBox,
+                new Separator(), stateBox
         );
         return vbox;
     }
@@ -322,13 +403,26 @@ public class DroneView extends HBox {
             return new SimpleStringProperty("N/A");
         });
 
-        table.getColumns().addAll(colId, colSerial, colModelo, colFabricante, colPeso, colAtributo);
+        TableColumn<Drone, String> colEstado = new TableColumn<>("Estado");
+        colEstado.setCellValueFactory(cellData -> {
+            // Consulta el estado a traves del wrapper (contexto State en memoria)
+            DroneWrapper wrapper = controller.obtenerWrapper(cellData.getValue());
+            String nombreEstado = (wrapper != null) ? wrapper.getNombreEstado() : "APAGADO";
+            return new SimpleStringProperty(estadoEmoji(nombreEstado));
+        });
+        colEstado.setPrefWidth(110);
+        colEstado.setStyle("-fx-alignment: CENTER;");
+
+        table.getColumns().addAll(colId, colSerial, colModelo, colFabricante, colPeso, colAtributo, colEstado);
         table.setItems(droneData);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
             if (newSel != null) {
                 cargarDroneEnFormulario(newSel);
+                actualizarControlesEstado(newSel);
+            } else {
+                resetControlesEstado();
             }
         });
 
@@ -726,6 +820,7 @@ public class DroneView extends HBox {
         capacidadField.clear();
         termicaCheck.setSelected(false);
         table.getSelectionModel().clearSelection();
+        resetControlesEstado();
     }
 
     private void refreshTable() {
@@ -746,5 +841,118 @@ public class DroneView extends HBox {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+
+    // ── GESTIÓN PATRÓN STATE (CONTROL DE ESTADOS OPERATIVOS) ──────────────
+
+    /**
+     * Ejecuta una transicion de estado sobre el dron seleccionado
+     * y actualiza la UI con el nuevo estado resultante.
+     */
+    private void ejecutarTransicionEstado(String operacion) {
+        Drone selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert(Alert.AlertType.WARNING, "Atención",
+                    "Por favor seleccione un dron de la tabla para cambiar su estado.");
+            return;
+        }
+
+        // Obtiene el wrapper para leer el estado anterior antes de la transicion
+        DroneWrapper wrapper = controller.obtenerWrapper(selected);
+        String estadoAnterior = (wrapper != null) ? wrapper.getNombreEstado() : "APAGADO";
+
+        try {
+            String nuevoEstado = controller.cambiarEstadoDrone(selected, operacion);
+            actualizarControlesEstado(selected);
+            table.refresh(); // Refresca la columna Estado en la tabla
+
+            showAlert(Alert.AlertType.INFORMATION, "Transición de Estado Exitosa",
+                    "🚁 Dron: " + selected.getId() + " (" + selected.getModelo() + ")\n\n"
+                    + "Estado anterior:  " + estadoEmoji(estadoAnterior) + "\n"
+                    + "Estado actual:    " + estadoEmoji(nuevoEstado) + "\n\n"
+                    + descripcionEstado(nuevoEstado));
+
+        } catch (IllegalStateException e) {
+            showAlert(Alert.AlertType.ERROR, "Transición No Permitida",
+                    "❌ Operación rechazada por el sistema.\n\n"
+                    + "Dron: " + selected.getId() + "\n"
+                    + "Estado actual: " + estadoEmoji(estadoAnterior) + "\n\n"
+                    + e.getMessage());
+        }
+    }
+
+    /**
+     * Actualiza el label de estado y habilita/deshabilita los botones
+     * segun los metodos polimorficos del patron State (sin evaluar cadenas de texto en la vista).
+     * Consulta el estado a traves del DroneWrapper (contexto State en memoria).
+     */
+    private void actualizarControlesEstado(Drone drone) {
+        if (drone == null) {
+            resetControlesEstado();
+            return;
+        }
+
+        // Obtiene el wrapper del controlador (contexto State); lo crea si no existe aun
+        DroneWrapper wrapper = controller.obtenerWrapper(drone);
+        DroneState state = (wrapper != null) ? wrapper.getEstadoActual() : null;
+
+        if (state == null) {
+            resetControlesEstado();
+            return;
+        }
+
+        lblEstadoActual.setText("Estado actual: " + estadoEmoji(state.getNombre()));
+
+        // Delegacion al patron State: cada estado decide si permite o no cada actividad
+        btnEncender.setDisable(!state.permiteEncender());
+        btnApagar.setDisable(!state.permiteApagar());
+        btnDespegar.setDisable(!state.permiteDespegar());
+        btnIniciarAterrizaje.setDisable(!state.permiteIniciarAterrizaje());
+        btnFinalizarAterrizaje.setDisable(!state.permiteFinalizarAterrizaje());
+    }
+
+    /**
+     * Resetea los controles de estado a su condicion inicial
+     * (sin dron seleccionado).
+     */
+    private void resetControlesEstado() {
+        lblEstadoActual.setText("Estado actual: [Ningún dron seleccionado]");
+        btnEncender.setDisable(true);
+        btnApagar.setDisable(true);
+        btnDespegar.setDisable(true);
+        btnIniciarAterrizaje.setDisable(true);
+        btnFinalizarAterrizaje.setDisable(true);
+    }
+
+    /**
+     * Convierte el nombre del estado en una representacion visual con emoji.
+     */
+    private String estadoEmoji(String nombreEstado) {
+        if (nombreEstado == null) return "APAGADO";
+        switch (nombreEstado) {
+            case "APAGADO":     return "🔴 APAGADO";
+            case "EN_ESPERA":   return "🟡 EN ESPERA";
+            case "VOLANDO":     return "🔵 VOLANDO";
+            case "ATERRIZANDO": return "🟠 ATERRIZANDO";
+            default:            return nombreEstado;
+        }
+    }
+
+    /**
+     * Retorna una descripcion operativa del estado para mostrarse en el popup.
+     */
+    private String descripcionEstado(String estado) {
+        switch (estado) {
+            case "APAGADO":
+                return "El dron está APAGADO. Puede encenderlo para prepararlo para una misión.";
+            case "EN_ESPERA":
+                return "El dron está en tierra, encendido y listo para despegar o ser apagado.";
+            case "VOLANDO":
+                return "El dron está en vuelo activo. Puede iniciar el aterrizaje cuando sea necesario.";
+            case "ATERRIZANDO":
+                return "El dron está ejecutando el proceso de aterrizaje. No puede iniciar un nuevo vuelo hasta finalizarlo.";
+            default:
+                return "Estado operativo actualizado.";
+        }
     }
 }

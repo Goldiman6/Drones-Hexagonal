@@ -2,9 +2,20 @@ package com.drone.dominio.modelo;
 
 import java.io.Serializable;
 
+/**
+ * Entidad abstracta base del dominio que representa un Vehículo Aéreo No Tripulado.
+ *
+ * <p>Esta clase es un modelo de dominio puro: solo contiene los atributos de identidad
+ * y datos del dron que se persisten en base de datos. No contiene ninguna logica
+ * de estado operativo (patron State).</p>
+ *
+ * <p>La gestion del ciclo operativo (APAGADO, EN_ESPERA, VOLANDO, ATERRIZANDO) se
+ * delega al {@code DroneWrapper} (contexto del patron State), que envuelve a esta
+ * entidad en memoria sin modificarla.</p>
+ */
 public abstract class Drone implements Serializable {
     private static final long serialVersionUID = 1L;
-    
+
     private String id;
     private String serial;
     private String modelo;
@@ -20,6 +31,8 @@ public abstract class Drone implements Serializable {
         this.fabricante = fabricante;
         this.peso = peso;
     }
+
+    // ── Getters / Setters de identidad ───────────────────────────────────────
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

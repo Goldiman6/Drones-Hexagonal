@@ -5,7 +5,9 @@ import com.drone.aplicacion.puerto.entrada.ConsultarClimaUseCase;
 import com.drone.aplicacion.puerto.entrada.CrearDroneUseCase;
 import com.drone.aplicacion.puerto.entrada.EliminarDroneUseCase;
 import com.drone.aplicacion.puerto.entrada.ListarDronesUseCase;
+import com.drone.aplicacion.puerto.entrada.ManageDroneStateUseCase;
 import com.drone.aplicacion.service.DroneOperacionService;
+import com.drone.aplicacion.service.DroneStateService;
 import com.drone.aplicacion.service.ProgramadorTareas;
 import com.drone.aplicacion.usecase.CalcularConsumoUseCase;
 import com.drone.aplicacion.weather.WeatherResultDTO;
@@ -15,12 +17,15 @@ import com.drone.dominio.command.EscanearZonaCommand;
 import com.drone.dominio.command.MedirTemperaturaCommand;
 import com.drone.dominio.command.TomarFotografiaCommand;
 import com.drone.dominio.modelo.Drone;
+import com.drone.dominio.state.DroneWrapper;
 import com.drone.dominio.strategy.ConsumoStrategy;
 import com.drone.dominio.strategy.ResultadoConsumo;
 import com.drone.dominio.strategy.Ruta;
 import com.drone.dominio.weather.WeatherSubject;
 import com.drone.infraestructura.loader.JsonRutaLoader;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DroneController {
 
@@ -33,6 +38,13 @@ public class DroneController {
     private final CalcularConsumoUseCase calcularConsumoUseCase;
     private final JsonRutaLoader jsonRutaLoader;
     private final ProgramadorTareas programadorTareas;
+    private final ManageDroneStateUseCase manageDroneStateUseCase;
+
+    /**
+     * Mapa en memoria que asocia el ID de cada dron con su DroneWrapper (contexto State).
+     * El estado operativo es transitorio: vive aqui durante la sesion y no se persiste en BD.
+     */
+    private final Map<String, DroneWrapper> droneWrappers = new HashMap<>();
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
                            ListarDronesUseCase listarDronesUseCase,
@@ -41,7 +53,8 @@ public class DroneController {
                            WeatherSubject weatherSubject,
                            ConsultarClimaUseCase consultarClimaUseCase) {
         this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
-                weatherSubject, consultarClimaUseCase, new CalcularConsumoUseCase(), new JsonRutaLoader(), new ProgramadorTareas());
+                weatherSubject, consultarClimaUseCase, new CalcularConsumoUseCase(),
+                new JsonRutaLoader(), new ProgramadorTareas(), new DroneStateService());
     }
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
@@ -53,7 +66,8 @@ public class DroneController {
                            CalcularConsumoUseCase calcularConsumoUseCase,
                            JsonRutaLoader jsonRutaLoader) {
         this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
-                weatherSubject, consultarClimaUseCase, calcularConsumoUseCase, jsonRutaLoader, new ProgramadorTareas());
+                weatherSubject, consultarClimaUseCase, calcularConsumoUseCase,
+                jsonRutaLoader, new ProgramadorTareas(), new DroneStateService());
     }
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
@@ -65,6 +79,21 @@ public class DroneController {
                            CalcularConsumoUseCase calcularConsumoUseCase,
                            JsonRutaLoader jsonRutaLoader,
                            ProgramadorTareas programadorTareas) {
+        this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
+                weatherSubject, consultarClimaUseCase, calcularConsumoUseCase,
+                jsonRutaLoader, programadorTareas, new DroneStateService());
+    }
+
+    public DroneController(CrearDroneUseCase crearDroneUseCase,
+                           ListarDronesUseCase listarDronesUseCase,
+                           ActualizarDroneUseCase actualizarDroneUseCase,
+                           EliminarDroneUseCase eliminarDroneUseCase,
+                           WeatherSubject weatherSubject,
+                           ConsultarClimaUseCase consultarClimaUseCase,
+                           CalcularConsumoUseCase calcularConsumoUseCase,
+                           JsonRutaLoader jsonRutaLoader,
+                           ProgramadorTareas programadorTareas,
+                           ManageDroneStateUseCase manageDroneStateUseCase) {
         this.crearDroneUseCase = crearDroneUseCase;
         this.listarDronesUseCase = listarDronesUseCase;
         this.actualizarDroneUseCase = actualizarDroneUseCase;
@@ -74,6 +103,7 @@ public class DroneController {
         this.calcularConsumoUseCase = calcularConsumoUseCase != null ? calcularConsumoUseCase : new CalcularConsumoUseCase();
         this.jsonRutaLoader = jsonRutaLoader != null ? jsonRutaLoader : new JsonRutaLoader();
         this.programadorTareas = programadorTareas != null ? programadorTareas : new ProgramadorTareas();
+        this.manageDroneStateUseCase = manageDroneStateUseCase != null ? manageDroneStateUseCase : new DroneStateService();
     }
 
     public void addDrone(Drone drone) throws Exception {
@@ -90,6 +120,8 @@ public class DroneController {
 
     public void deleteDrone(String id) throws Exception {
         eliminarDroneUseCase.ejecutar(id);
+        // Eliminar tambien el wrapper en memoria al eliminar el dron
+        droneWrappers.remove(id);
     }
 
     // ── GESTIÓN PATRÓN OBSERVER (EN MEMORIA) ──
@@ -165,5 +197,35 @@ public class DroneController {
 
     public ProgramadorTareas getProgramadorTareas() {
         return programadorTareas;
+    }
+
+    // ── GESTIÓN PATRÓN STATE (ESTADOS OPERATIVOS) ──
+
+    /**
+     * Obtiene el DroneWrapper existente para el dron dado, o crea uno nuevo si no existe.
+     * El wrapper es el Contexto del patron State y vive en memoria durante la sesion.
+     *
+     * @param drone entidad de dominio cuyo wrapper se necesita
+     * @return instancia de {@link DroneWrapper} asociada al ID del dron
+     */
+    public DroneWrapper obtenerWrapper(Drone drone) {
+        if (drone == null || drone.getId() == null) return null;
+        return droneWrappers.computeIfAbsent(drone.getId(), id -> new DroneWrapper(drone));
+    }
+
+    /**
+     * Ejecuta una transicion de estado sobre el DroneWrapper del dron seleccionado.
+     * El wrapper se crea automaticamente si es la primera operacion sobre ese dron.
+     *
+     * @param drone     el dron de dominio cuyo estado operativo se desea cambiar
+     * @param operacion operacion a ejecutar (ENCENDER, APAGAR, DESPEGAR,
+     *                  INICIAR_ATERRIZAJE, FINALIZAR_ATERRIZAJE)
+     * @return nombre del nuevo estado tras la transicion
+     * @throws IllegalStateException    si la transicion no esta permitida
+     * @throws IllegalArgumentException si la operacion es desconocida
+     */
+    public String cambiarEstadoDrone(Drone drone, String operacion) {
+        DroneWrapper wrapper = obtenerWrapper(drone);
+        return manageDroneStateUseCase.ejecutarTransicion(wrapper, operacion);
     }
 }

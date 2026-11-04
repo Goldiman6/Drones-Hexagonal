@@ -19,6 +19,7 @@ module co.edu.poli.SW2 {
     opens com.drone.dominio.strategy to javafx.base, com.fasterxml.jackson.databind;
     exports com.drone.dominio.strategy;
     exports com.drone.dominio.command;
+    exports com.drone.dominio.state;
 
     // Aplicacion
     exports com.drone.aplicacion.puerto.entrada;

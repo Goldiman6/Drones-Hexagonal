@@ -7,9 +7,13 @@ import com.drone.dominio.modelo.Vigilancia;
 /**
  * Receptor (Receiver) y Wrapper del patron Command.
  *
- * <p>Envuelve a una entidad {@link Drone} existente sin modificar su clase original,
- * proporcionando la implementacion tecnica y logica de ejecucion para cada
- * una de las tareas u operaciones que el dron puede realizar en una mision.</p>
+ * <p>Envuelve a una entidad {@link Drone} existente, proporcionando la implementacion
+ * tecnica para cada una de las tareas u operaciones que el dron puede realizar en una mision.</p>
+ *
+ * <p>Nota sobre el patron State: la validacion del estado operativo (APAGADO, EN_ESPERA,
+ * VOLANDO, ATERRIZANDO) se gestiona a traves del {@code DroneWrapper} en el controlador.
+ * Este servicio receptor ejecuta las tareas tecnicas asumiendo que el dron ya fue validado
+ * como operativo antes de encolarse en la mision.</p>
  */
 public class DroneOperacionService {
 
@@ -34,7 +38,7 @@ public class DroneOperacionService {
      * @return reporte de la fotografia tomada
      */
     public String tomarFotografia() {
-        String id = drone != null ? drone.getId() : "N/A";
+        String id     = drone != null ? drone.getId()     : "N/A";
         String modelo = drone != null ? drone.getModelo() : "Generico";
         return String.format(
                 "Captura aerea 4K (3840x2160) realizada por dron %s (%s) a 120m de altura con angulo de 45 grados. Imagen georreferenciada guardada en almacenamiento local.",
@@ -49,7 +53,7 @@ public class DroneOperacionService {
      * @return reporte detallado del escaneo realizado
      */
     public String escanearZona() {
-        String id = drone != null ? drone.getId() : "N/A";
+        String id     = drone != null ? drone.getId()     : "N/A";
         String modelo = drone != null ? drone.getModelo() : "Generico";
 
         if (drone instanceof Agricultura) {
@@ -77,7 +81,7 @@ public class DroneOperacionService {
      * @return reporte de temperatura ambiental y de los motores
      */
     public String medirTemperatura() {
-        String id = drone != null ? drone.getId() : "N/A";
+        String id     = drone != null ? drone.getId()     : "N/A";
         String modelo = drone != null ? drone.getModelo() : "Generico";
         return String.format(
                 "Telemetria termica por dron %s (%s): Sensor infrarrojo calibrado. Temperatura ambiente: 18.7 C | Temperatura de motores: 36.2 C (Rango seguro y optimo).",

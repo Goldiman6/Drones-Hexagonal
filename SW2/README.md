@@ -47,6 +47,15 @@ Aplicación para la gestión de vehículos aéreos no tripulados (Drones), desar
 - **Receptor / Wrapper (`DroneOperacionService`):** Envuelve al dron sin modificar la entidad de dominio `Drone`, ejecutando las operaciones según la especialidad del vehículo.
 - **Invocador (`ProgramadorTareas`):** Encola la secuencia de tareas y las ejecuta en el orden programado mostrando un informe consolidado.
 
+### 7. Ciclo de Estados Operativos (Patrón State)
+- **Máquina de Estados Finita:** Cada dron mantiene su condición operativa delegando las transiciones a objetos de estado polimórficos (`DroneState`).
+- **Estados Modelados:**
+  1. `OffState` (🔴 APAGADO): No operativo; solo permite encenderse.
+  2. `ReadyState` (🟡 EN ESPERA): Encendido y en tierra; listo para despegar o apagarse.
+  3. `FlyingState` (🔵 VOLANDO): En vuelo activo; únicamente permite iniciar aterrizaje.
+  4. `LandingState` (🟠 ATERRIZANDO): Proceso de descenso; no permite nuevas operaciones hasta finalizar el aterrizaje y regresar a `EN_ESPERA`.
+- **Validación Estricta:** Las transiciones no válidas lanzan `IllegalStateException` y son rechazadas por el sistema. En la interfaz gráfica JavaFX los botones se habilitan o deshabilitan dinámicamente y la tabla refleja el estado actualizado en tiempo real.
+
 ---
 
 ## 🛠️ Tecnologías Utilizadas
@@ -62,7 +71,7 @@ Aplicación para la gestión de vehículos aéreos no tripulados (Drones), desar
 - **Patrones de Diseño Implementados:**
   - *Arquitectónico:* Hexagonal (Ports & Adapters)
   - *Creacional:* Singleton (Conexión BD), Factory Method (Cadena de validación)
-  - *Comportamiento:* Observer (Suscripción climática), Chain of Responsibility (Viabilidad climática), Strategy (Consumo energético ponderado por peso), Command (Secuencia de tareas de misión)
+  - *Comportamiento:* Observer (Suscripción climática), Chain of Responsibility (Viabilidad climática), Strategy (Consumo energético ponderado por peso), Command (Secuencia de tareas de misión), State (Ciclo de estados operativos de drones)
 
 ---
 
@@ -169,11 +178,18 @@ SW2/
                 │   │   ├── AltoRendimientoStrategy.java          # Modo alto rendimiento (+2%/kg)
                 │   │   └── ResultadoConsumo.java                 # Veredicto de autonomía
                 │   │
-                │   └── command/                                  # Patrón Command (Tareas de Misión)
-                │       ├── DroneCommand.java                     # Interfaz de comando
-                │       ├── TomarFotografiaCommand.java           # Tarea: Fotografía 4K
-                │       ├── EscanearZonaCommand.java              # Tarea: Escaneo multiespectral/LiDAR
-                │       └── MedirTemperaturaCommand.java          # Tarea: Telemetría térmica
+                │   ├── command/                                  # Patrón Command (Tareas de Misión)
+                │   │   ├── DroneCommand.java                     # Interfaz de comando
+                │   │   ├── TomarFotografiaCommand.java           # Tarea: Fotografía 4K
+                │   │   ├── EscanearZonaCommand.java              # Tarea: Escaneo multiespectral/LiDAR
+                │   │   └── MedirTemperaturaCommand.java          # Tarea: Telemetría térmica
+                │   │
+                │   └── state/                                    # Patrón State (Ciclo Operativo)
+                │       ├── DroneState.java                       # Interfaz de estado
+                │       ├── OffState.java                         # Estado APAGADO
+                │       ├── ReadyState.java                       # Estado EN_ESPERA
+                │       ├── FlyingState.java                      # Estado VOLANDO
+                │       └── LandingState.java                     # Estado ATERRIZANDO
                 │
                 ├── aplicacion/
                 │   ├── puerto/
@@ -182,7 +198,8 @@ SW2/
                 │   │   │   ├── ListarDronesUseCase.java
                 │   │   │   ├── ActualizarDroneUseCase.java
                 │   │   │   ├── EliminarDroneUseCase.java
-                │   │   │   └── ConsultarClimaUseCase.java
+                │   │   │   ├── ConsultarClimaUseCase.java
+                │   │   │   └── ManageDroneStateUseCase.java      # Puerto gestión de estados
                 │   │   │
                 │   │   └── salida/                               # Interfaces hacia el exterior
                 │   │       ├── DroneRepository.java
@@ -195,9 +212,10 @@ SW2/
                 │   │   ├── EliminarDroneServicio.java
                 │   │   └── ConsultarClimaServicio.java
                 │   │
-                │   ├── service/                                  # Servicios del Patrón Command
+                │   ├── service/                                  # Servicios de Command y State
                 │   │   ├── DroneOperacionService.java            # Receptor / Wrapper de Drone
-                │   │   └── ProgramadorTareas.java                # Invocador (Cola de tareas)
+                │   │   ├── ProgramadorTareas.java                # Invocador Command
+                │   │   └── DroneStateService.java                # Servicio del Patrón State
                 │   │
                 │   ├── usecase/                                  # Contexto Strategy
                 │   │   └── CalcularConsumoUseCase.java           # Contexto del Patrón Strategy
