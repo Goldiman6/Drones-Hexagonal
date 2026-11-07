@@ -24,8 +24,11 @@ module co.edu.poli.SW2 {
     // Aplicacion
     exports com.drone.aplicacion.puerto.entrada;
     exports com.drone.aplicacion.puerto.salida;
+    exports com.drone.aplicacion.port.in;
     exports com.drone.aplicacion.servicio;
     exports com.drone.aplicacion.service;
+    exports com.drone.aplicacion.mediator;
+    exports com.drone.aplicacion.mediator.components;
     exports com.drone.aplicacion.weather;
     exports com.drone.aplicacion.weather.observer;
     exports com.drone.aplicacion.usecase;

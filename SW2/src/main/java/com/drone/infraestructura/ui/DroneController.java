@@ -4,10 +4,13 @@ import com.drone.aplicacion.puerto.entrada.ActualizarDroneUseCase;
 import com.drone.aplicacion.puerto.entrada.ConsultarClimaUseCase;
 import com.drone.aplicacion.puerto.entrada.CrearDroneUseCase;
 import com.drone.aplicacion.puerto.entrada.EliminarDroneUseCase;
+import com.drone.aplicacion.puerto.entrada.ExecuteMissionUseCase;
 import com.drone.aplicacion.puerto.entrada.ListarDronesUseCase;
 import com.drone.aplicacion.puerto.entrada.ManageDroneStateUseCase;
+import com.drone.aplicacion.mediator.MissionExecutionResult;
 import com.drone.aplicacion.service.DroneOperacionService;
 import com.drone.aplicacion.service.DroneStateService;
+import com.drone.aplicacion.service.MissionService;
 import com.drone.aplicacion.service.ProgramadorTareas;
 import com.drone.aplicacion.usecase.CalcularConsumoUseCase;
 import com.drone.aplicacion.weather.WeatherResultDTO;
@@ -39,6 +42,7 @@ public class DroneController {
     private final JsonRutaLoader jsonRutaLoader;
     private final ProgramadorTareas programadorTareas;
     private final ManageDroneStateUseCase manageDroneStateUseCase;
+    private final ExecuteMissionUseCase executeMissionUseCase;
 
     /**
      * Mapa en memoria que asocia el ID de cada dron con su DroneWrapper (contexto State).
@@ -54,7 +58,7 @@ public class DroneController {
                            ConsultarClimaUseCase consultarClimaUseCase) {
         this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
                 weatherSubject, consultarClimaUseCase, new CalcularConsumoUseCase(),
-                new JsonRutaLoader(), new ProgramadorTareas(), new DroneStateService());
+                new JsonRutaLoader(), new ProgramadorTareas(), new DroneStateService(), new MissionService());
     }
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
@@ -67,7 +71,7 @@ public class DroneController {
                            JsonRutaLoader jsonRutaLoader) {
         this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
                 weatherSubject, consultarClimaUseCase, calcularConsumoUseCase,
-                jsonRutaLoader, new ProgramadorTareas(), new DroneStateService());
+                jsonRutaLoader, new ProgramadorTareas(), new DroneStateService(), new MissionService());
     }
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
@@ -81,7 +85,7 @@ public class DroneController {
                            ProgramadorTareas programadorTareas) {
         this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
                 weatherSubject, consultarClimaUseCase, calcularConsumoUseCase,
-                jsonRutaLoader, programadorTareas, new DroneStateService());
+                jsonRutaLoader, programadorTareas, new DroneStateService(), new MissionService());
     }
 
     public DroneController(CrearDroneUseCase crearDroneUseCase,
@@ -94,6 +98,22 @@ public class DroneController {
                            JsonRutaLoader jsonRutaLoader,
                            ProgramadorTareas programadorTareas,
                            ManageDroneStateUseCase manageDroneStateUseCase) {
+        this(crearDroneUseCase, listarDronesUseCase, actualizarDroneUseCase, eliminarDroneUseCase,
+                weatherSubject, consultarClimaUseCase, calcularConsumoUseCase,
+                jsonRutaLoader, programadorTareas, manageDroneStateUseCase, new MissionService());
+    }
+
+    public DroneController(CrearDroneUseCase crearDroneUseCase,
+                           ListarDronesUseCase listarDronesUseCase,
+                           ActualizarDroneUseCase actualizarDroneUseCase,
+                           EliminarDroneUseCase eliminarDroneUseCase,
+                           WeatherSubject weatherSubject,
+                           ConsultarClimaUseCase consultarClimaUseCase,
+                           CalcularConsumoUseCase calcularConsumoUseCase,
+                           JsonRutaLoader jsonRutaLoader,
+                           ProgramadorTareas programadorTareas,
+                           ManageDroneStateUseCase manageDroneStateUseCase,
+                           ExecuteMissionUseCase executeMissionUseCase) {
         this.crearDroneUseCase = crearDroneUseCase;
         this.listarDronesUseCase = listarDronesUseCase;
         this.actualizarDroneUseCase = actualizarDroneUseCase;
@@ -104,6 +124,7 @@ public class DroneController {
         this.jsonRutaLoader = jsonRutaLoader != null ? jsonRutaLoader : new JsonRutaLoader();
         this.programadorTareas = programadorTareas != null ? programadorTareas : new ProgramadorTareas();
         this.manageDroneStateUseCase = manageDroneStateUseCase != null ? manageDroneStateUseCase : new DroneStateService();
+        this.executeMissionUseCase = executeMissionUseCase != null ? executeMissionUseCase : new MissionService();
     }
 
     public void addDrone(Drone drone) throws Exception {
@@ -227,5 +248,19 @@ public class DroneController {
     public String cambiarEstadoDrone(Drone drone, String operacion) {
         DroneWrapper wrapper = obtenerWrapper(drone);
         return manageDroneStateUseCase.ejecutarTransicion(wrapper, operacion);
+    }
+
+    // ── GESTIÓN PATRÓN MEDIATOR (COORDINACIÓN DE OPERACIÓN DE VIGILANCIA) ──
+
+    /**
+     * Inicia y coordina una operacion de vigilancia mediante el patron GoF Mediator.
+     * Centraliza la comunicacion entre NavigationSystem, SensorSystem, BatterySystem
+     * y CommunicationSystem a traves del mediador MissionCoordinator.
+     *
+     * @param sectorVigilancia sector o zona geografica asignada
+     * @return resultado de la ejecucion con bitacora de coordinacion
+     */
+    public MissionExecutionResult coordinarOperacionVigilancia(String sectorVigilancia) {
+        return executeMissionUseCase.ejecutarMisionVigilancia(sectorVigilancia);
     }
 }

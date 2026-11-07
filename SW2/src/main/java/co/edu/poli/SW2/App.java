@@ -12,7 +12,9 @@ import com.drone.aplicacion.puerto.entrada.ListarDronesUseCase;
 import com.drone.aplicacion.puerto.salida.DroneRepository;
 import com.drone.aplicacion.puerto.salida.WeatherApiClientPort;
 import com.drone.aplicacion.puerto.entrada.ManageDroneStateUseCase;
+import com.drone.aplicacion.puerto.entrada.ExecuteMissionUseCase;
 import com.drone.aplicacion.service.DroneStateService;
+import com.drone.aplicacion.service.MissionService;
 import com.drone.aplicacion.service.ProgramadorTareas;
 import com.drone.aplicacion.servicio.ActualizarDroneServicio;
 import com.drone.aplicacion.servicio.ConsultarClimaServicio;
@@ -48,11 +50,13 @@ public class App extends Application {
         CalcularConsumoUseCase calcularConsumoUC = new CalcularConsumoUseCase();
         ProgramadorTareas programadorTareas = new ProgramadorTareas();
         ManageDroneStateUseCase manageDroneStateUC = new DroneStateService();
+        ExecuteMissionUseCase executeMissionUC = new MissionService();
 
         // 4. Instanciar Adaptador de Entrada (Controller)
         DroneController controller = new DroneController(
                 crearUC, listarUC, actualizarUC, eliminarUC, weatherSubject,
-                consultarClimaUC, calcularConsumoUC, jsonRutaLoader, programadorTareas, manageDroneStateUC);
+                consultarClimaUC, calcularConsumoUC, jsonRutaLoader, programadorTareas,
+                manageDroneStateUC, executeMissionUC);
 
         // 5. Iniciar la UI (JavaFX)
         DroneView root = new DroneView(controller);

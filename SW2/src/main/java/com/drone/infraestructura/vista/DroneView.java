@@ -1,5 +1,6 @@
 package com.drone.infraestructura.vista;
 
+import com.drone.aplicacion.mediator.MissionExecutionResult;
 import com.drone.aplicacion.weather.WeatherResultDTO;
 import com.drone.dominio.command.DroneCommand;
 import com.drone.dominio.modelo.Agricultura;
@@ -74,6 +75,10 @@ public class DroneView extends HBox {
     private Button btnDespegar;
     private Button btnIniciarAterrizaje;
     private Button btnFinalizarAterrizaje;
+
+    // Componentes Patrón Mediator (Coordinación de Misión de Vigilancia)
+    private ComboBox<String> sectorVigilanciaCombo;
+    private Button btnCoordinarVigilancia;
 
     public DroneView(DroneController controller) {
         this.controller = controller;
@@ -364,12 +369,49 @@ public class DroneView extends HBox {
                 stateRow3
         );
 
+        // ── SECCIÓN: PATRÓN MEDIATOR (COORDINACIÓN DE OPERACIONES DE VIGILANCIA) ──
+        VBox mediatorBox = new VBox(8);
+        mediatorBox.setPadding(new Insets(10));
+        mediatorBox.setStyle("-fx-border-color: #205493; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-color: #f0f6fc;");
+
+        Label mediatorTitle = new Label("Coordinación de Misión (Patrón Mediator)");
+        mediatorTitle.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #112e51;");
+
+        Label mediatorHelp = new Label("Coordina los 4 subsistemas (Batería, Comunicación, Navegación, Sensores) exclusivamente a través de DroneMediator:");
+        mediatorHelp.setStyle("-fx-font-size: 11px; -fx-text-fill: #444;");
+        mediatorHelp.setWrapText(true);
+
+        Label sectorLabel = new Label("Sector de Vigilancia:");
+        sectorLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+
+        sectorVigilanciaCombo = new ComboBox<>(FXCollections.observableArrayList(
+                "Sector Alfa - Perímetro Base Norte",
+                "Sector Bravo - Frontera Forestal",
+                "Sector Charlie - Instalaciones Críticas"
+        ));
+        sectorVigilanciaCombo.setValue(sectorVigilanciaCombo.getItems().get(0));
+        sectorVigilanciaCombo.setMaxWidth(Double.MAX_VALUE);
+
+        btnCoordinarVigilancia = new Button("🛡️ Iniciar Operación de Vigilancia (Mediator)");
+        btnCoordinarVigilancia.setMaxWidth(Double.MAX_VALUE);
+        btnCoordinarVigilancia.setStyle("-fx-background-color: #205493; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        btnCoordinarVigilancia.setOnAction(e -> coordinarOperacionVigilancia());
+
+        mediatorBox.getChildren().addAll(
+                mediatorTitle,
+                mediatorHelp,
+                sectorLabel,
+                sectorVigilanciaCombo,
+                btnCoordinarVigilancia
+        );
+
         vbox.getChildren().addAll(
                 title, grid, new Separator(), btnBox,
                 new Separator(), weatherBox,
                 new Separator(), strategyBox,
                 new Separator(), commandBox,
-                new Separator(), stateBox
+                new Separator(), stateBox,
+                new Separator(), mediatorBox
         );
         return vbox;
     }
@@ -953,6 +995,48 @@ public class DroneView extends HBox {
                 return "El dron está ejecutando el proceso de aterrizaje. No puede iniciar un nuevo vuelo hasta finalizarlo.";
             default:
                 return "Estado operativo actualizado.";
+        }
+    }
+
+    // ── GESTIÓN PATRÓN MEDIATOR (COORDINACIÓN DE OPERACIÓN DE VIGILANCIA) ──
+
+    /**
+     * Dispara la coordinacion de la operacion de vigilancia a traves del mediador
+     * y presenta en un Pop-up la bitacora y resultado de los 4 componentes.
+     */
+    private void coordinarOperacionVigilancia() {
+        String sector = sectorVigilanciaCombo != null ? sectorVigilanciaCombo.getValue() : "Sector Perimetral Alfa";
+        try {
+            MissionExecutionResult resultado = controller.coordinarOperacionVigilancia(sector);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("🛡️ MISIÓN COORDINADA: Operación de Vigilancia y Patrullaje\n");
+            sb.append("📍 Sector Asignado: ").append(resultado.getSector()).append("\n");
+            sb.append("🤖 Mediador Central: MissionCoordinator (Patrón GoF Mediator)\n\n");
+            sb.append("📋 SECUENCIA DE COMUNICACIÓN E INTERACCIÓN ENTRE COMPONENTES:\n");
+            sb.append("───────────────────────────────────────────────────────────────\n");
+
+            for (String paso : resultado.getPasos()) {
+                sb.append(paso).append("\n");
+            }
+
+            sb.append("───────────────────────────────────────────────────────────────\n\n");
+            sb.append(resultado.isExitoso()
+                    ? "✅ ESTADO FINAL: Misión autorizada y en ejecución."
+                    : "❌ ESTADO FINAL: Misión abortada por condiciones no cumplidas.");
+
+            Alert alert = new Alert(resultado.isExitoso() ? Alert.AlertType.INFORMATION : Alert.AlertType.WARNING);
+            alert.setTitle("Coordinación de Misión (Patrón Mediator)");
+            alert.setHeaderText(resultado.isExitoso()
+                    ? "¡OPERACIÓN DE VIGILANCIA COORDINADA CON ÉXITO!"
+                    : "ALERTA: LA OPERACIÓN NO PUDO SER COORDINADA");
+            alert.setContentText(sb.toString());
+            alert.getDialogPane().setPrefWidth(680);
+            alert.showAndWait();
+
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Error de Coordinación",
+                    "No se pudo completar la coordinación de la misión: " + e.getMessage());
         }
     }
 }
