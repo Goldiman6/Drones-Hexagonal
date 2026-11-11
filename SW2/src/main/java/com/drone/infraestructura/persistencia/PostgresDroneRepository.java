@@ -10,8 +10,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PostgresDroneRepository implements DroneRepository {
+
+    private static final Logger LOGGER = Logger.getLogger(PostgresDroneRepository.class.getName());
 
     @Override
     public void guardar(Drone drone) throws Exception {
@@ -31,28 +35,13 @@ public class PostgresDroneRepository implements DroneRepository {
                 ps.executeUpdate();
             }
 
-            if (drone instanceof Agricultura) {
-                String insertAgri = "INSERT INTO drones_agricultura (id_drone, capacidad_tanque) VALUES (?, ?)";
-                try (PreparedStatement ps = conn.prepareStatement(insertAgri)) {
-                    ps.setString(1, drone.getId());
-                    ps.setDouble(2, ((Agricultura) drone).getCapacidadTanque());
-                    ps.executeUpdate();
-                }
-            } else if (drone instanceof Vigilancia) {
-                String insertVigi = "INSERT INTO drones_vigilancia (id_drone, deteccion_termica) VALUES (?, ?)";
-                try (PreparedStatement ps = conn.prepareStatement(insertVigi)) {
-                    ps.setString(1, drone.getId());
-                    ps.setBoolean(2, ((Vigilancia) drone).isDeteccionTermica());
-                    ps.executeUpdate();
-                }
-            }
-
+            persistirSubtipo(conn, drone, false);
             conn.commit();
         } catch (SQLException e) {
-            try { if (conn != null) conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            rollbackQuietly(conn, "guardar");
             manejarErrorSql(e);
         } finally {
-            try { if (conn != null) conn.setAutoCommit(true); } catch (SQLException ex) { ex.printStackTrace(); }
+            restoreAutoCommitQuietly(conn, "guardar");
         }
     }
 
@@ -78,10 +67,12 @@ public class PostgresDroneRepository implements DroneRepository {
                 String fabricante = rs.getString("fabricante");
                 double peso = rs.getDouble("peso");
 
-                if (rs.getObject("capacidad_tanque") != null) {
-                    double capacidad = rs.getDouble("capacidad_tanque");
+                double capacidad = rs.getDouble("capacidad_tanque");
+                boolean esAgricultura = !rs.wasNull();
+
+                if (esAgricultura) {
                     lista.add(new Agricultura(id, serial, modelo, fabricante, peso, capacidad));
-                } else if (rs.getObject("deteccion_termica") != null) {
+                } else {
                     boolean termica = rs.getBoolean("deteccion_termica");
                     lista.add(new Vigilancia(id, serial, modelo, fabricante, peso, termica));
                 }
@@ -107,32 +98,16 @@ public class PostgresDroneRepository implements DroneRepository {
                 ps.setString(3, drone.getFabricante());
                 ps.setDouble(4, drone.getPeso());
                 ps.setString(5, drone.getId());
-                int filas = ps.executeUpdate();
-                if (filas == 0) throw new Exception("El dron con ID " + drone.getId() + " no existe.");
+                ps.executeUpdate();
             }
 
-            if (drone instanceof Agricultura) {
-                String updateAgri = "UPDATE drones_agricultura SET capacidad_tanque=? WHERE id_drone=?";
-                try (PreparedStatement ps = conn.prepareStatement(updateAgri)) {
-                    ps.setDouble(1, ((Agricultura) drone).getCapacidadTanque());
-                    ps.setString(2, drone.getId());
-                    ps.executeUpdate();
-                }
-            } else if (drone instanceof Vigilancia) {
-                String updateVigi = "UPDATE drones_vigilancia SET deteccion_termica=? WHERE id_drone=?";
-                try (PreparedStatement ps = conn.prepareStatement(updateVigi)) {
-                    ps.setBoolean(1, ((Vigilancia) drone).isDeteccionTermica());
-                    ps.setString(2, drone.getId());
-                    ps.executeUpdate();
-                }
-            }
-
+            persistirSubtipo(conn, drone, true);
             conn.commit();
         } catch (SQLException e) {
-            try { if (conn != null) conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            rollbackQuietly(conn, "actualizar");
             manejarErrorSql(e);
         } finally {
-            try { if (conn != null) conn.setAutoCommit(true); } catch (SQLException ex) { ex.printStackTrace(); }
+            restoreAutoCommitQuietly(conn, "actualizar");
         }
     }
 
@@ -148,6 +123,60 @@ public class PostgresDroneRepository implements DroneRepository {
             if (filas == 0) throw new Exception("El dron con ID " + id + " no existe o ya fue eliminado.");
         } catch (SQLException e) {
             throw new Exception("Error al eliminar el dron: " + e.getMessage());
+        }
+    }
+
+    private void persistirSubtipo(Connection conn, Drone drone, boolean esActualizacion) throws SQLException {
+        if (drone instanceof Agricultura) {
+            Agricultura agri = (Agricultura) drone;
+            String sql = esActualizacion
+                    ? "UPDATE drones_agricultura SET capacidad_tanque=? WHERE id_drone=?"
+                    : "INSERT INTO drones_agricultura (id_drone, capacidad_tanque) VALUES (?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                if (esActualizacion) {
+                    ps.setDouble(1, agri.getCapacidadTanque());
+                    ps.setString(2, drone.getId());
+                } else {
+                    ps.setString(1, drone.getId());
+                    ps.setDouble(2, agri.getCapacidadTanque());
+                }
+                ps.executeUpdate();
+            }
+        } else if (drone instanceof Vigilancia) {
+            Vigilancia vigi = (Vigilancia) drone;
+            String sql = esActualizacion
+                    ? "UPDATE drones_vigilancia SET deteccion_termica=? WHERE id_drone=?"
+                    : "INSERT INTO drones_vigilancia (id_drone, deteccion_termica) VALUES (?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                if (esActualizacion) {
+                    ps.setBoolean(1, vigi.isDeteccionTermica());
+                    ps.setString(2, drone.getId());
+                } else {
+                    ps.setString(1, drone.getId());
+                    ps.setBoolean(2, vigi.isDeteccionTermica());
+                }
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    private void rollbackQuietly(Connection conn, String operacion) {
+        if (conn != null) {
+            try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                LOGGER.log(Level.WARNING, "Error al realizar rollback en " + operacion + "()", ex);
+            }
+        }
+    }
+
+    private void restoreAutoCommitQuietly(Connection conn, String operacion) {
+        if (conn != null) {
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException ex) {
+                LOGGER.log(Level.WARNING, "Error al restaurar autoCommit en " + operacion + "()", ex);
+            }
         }
     }
     

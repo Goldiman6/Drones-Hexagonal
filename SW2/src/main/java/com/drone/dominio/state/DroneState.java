@@ -34,7 +34,11 @@ public interface DroneState {
      * @param context contexto (wrapper) del dron sobre el cual opera el estado
      * @throws IllegalStateException si la transicion no es permitida desde este estado
      */
-    void encender(DroneWrapper context);
+    default void encender(DroneWrapper context) {
+        throw new IllegalStateException(
+            "Transicion invalida: El dron '" + context.getId() + "' no puede encenderse desde el estado " + getNombre() + "."
+        );
+    }
 
     /**
      * Ejecuta la actividad de apagado sobre el contexto del dron.
@@ -43,7 +47,11 @@ public interface DroneState {
      * @param context contexto (wrapper) del dron sobre el cual opera el estado
      * @throws IllegalStateException si la transicion no es permitida desde este estado
      */
-    void apagar(DroneWrapper context);
+    default void apagar(DroneWrapper context) {
+        throw new IllegalStateException(
+            "Transicion invalida: El dron '" + context.getId() + "' no puede apagarse desde el estado " + getNombre() + "."
+        );
+    }
 
     /**
      * Ejecuta la actividad de despegue sobre el contexto del dron.
@@ -52,7 +60,11 @@ public interface DroneState {
      * @param context contexto (wrapper) del dron sobre el cual opera el estado
      * @throws IllegalStateException si la transicion no es permitida desde este estado
      */
-    void despegar(DroneWrapper context);
+    default void despegar(DroneWrapper context) {
+        throw new IllegalStateException(
+            "Transicion invalida: El dron '" + context.getId() + "' no puede despegar desde el estado " + getNombre() + "."
+        );
+    }
 
     /**
      * Ejecuta el inicio del proceso de aterrizaje sobre el contexto del dron.
@@ -61,7 +73,11 @@ public interface DroneState {
      * @param context contexto (wrapper) del dron sobre el cual opera el estado
      * @throws IllegalStateException si la transicion no es permitida desde este estado
      */
-    void iniciarAterrizaje(DroneWrapper context);
+    default void iniciarAterrizaje(DroneWrapper context) {
+        throw new IllegalStateException(
+            "Transicion invalida: El dron '" + context.getId() + "' no puede iniciar aterrizaje desde el estado " + getNombre() + "."
+        );
+    }
 
     /**
      * Ejecuta la finalizacion del proceso de aterrizaje sobre el contexto del dron.
@@ -70,25 +86,43 @@ public interface DroneState {
      * @param context contexto (wrapper) del dron sobre el cual opera el estado
      * @throws IllegalStateException si la transicion no es permitida desde este estado
      */
-    void finalizarAterrizaje(DroneWrapper context);
+    default void finalizarAterrizaje(DroneWrapper context) {
+        throw new IllegalStateException(
+            "Transicion invalida: El dron '" + context.getId() + "' no puede finalizar aterrizaje desde el estado " + getNombre() + "."
+        );
+    }
 
     // ── Metodos polimorficos de consulta de permisos de actividad ─────────────
+    // Se proporcionan implementaciones por defecto (retornando false) para evitar
+    // duplicacion en las clases concretas de estado.
 
     /** Indica si desde este estado se permite la actividad de encendido. */
-    boolean permiteEncender();
+    default boolean permiteEncender() {
+        return false;
+    }
 
     /** Indica si desde este estado se permite la actividad de apagado. */
-    boolean permiteApagar();
+    default boolean permiteApagar() {
+        return false;
+    }
 
     /** Indica si desde este estado se permite la actividad de despegue. */
-    boolean permiteDespegar();
+    default boolean permiteDespegar() {
+        return false;
+    }
 
     /** Indica si desde este estado se permite iniciar el aterrizaje. */
-    boolean permiteIniciarAterrizaje();
+    default boolean permiteIniciarAterrizaje() {
+        return false;
+    }
 
     /** Indica si desde este estado se permite finalizar el aterrizaje. */
-    boolean permiteFinalizarAterrizaje();
+    default boolean permiteFinalizarAterrizaje() {
+        return false;
+    }
 
     /** Indica si el dron se encuentra en una condicion apta para ejecutar misiones tecnicas. */
-    boolean estaOperativoParaMision();
+    default boolean estaOperativoParaMision() {
+        return false;
+    }
 }

@@ -5,6 +5,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Patron Singleton aplicado a la conexion de Base de Datos.
@@ -19,6 +21,39 @@ import java.util.Properties;
  * de esta forma no quedan expuestas en el codigo fuente.
  */
 public class Singleton {
+
+    private static final Logger LOGGER = Logger.getLogger(Singleton.class.getName());
+
+    static {
+        // Redirige los logs a System.out (blanco en consola) en lugar de System.err (rojo)
+        LOGGER.setUseParentHandlers(false);
+        java.util.logging.StreamHandler stdoutHandler = new java.util.logging.StreamHandler(
+            System.out,
+            new java.util.logging.Formatter() {
+                @Override
+                public String format(java.util.logging.LogRecord record) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("[").append(record.getLevel()).append("] ")
+                      .append(record.getMessage())
+                      .append(System.lineSeparator());
+                    if (record.getThrown() != null) {
+                        java.io.StringWriter sw = new java.io.StringWriter();
+                        java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+                        record.getThrown().printStackTrace(pw);
+                        sb.append(sw);
+                    }
+                    return sb.toString();
+                }
+            }
+        ) {
+            @Override
+            public synchronized void publish(java.util.logging.LogRecord record) {
+                super.publish(record);
+                flush();
+            }
+        };
+        LOGGER.addHandler(stdoutHandler);
+    }
 
     /** La unica instancia de esta clase. Es estatica para que sea global. */
     private static Singleton instancia;
@@ -41,10 +76,9 @@ public class Singleton {
         try {
             // Intentamos conectar con las credenciales cargadas
             conexion = DriverManager.getConnection(url, usuario, clave);
-            System.out.println("Conexion a base de datos (PostgreSQL) establecida exitosamente.");
+            LOGGER.info("Conexion a base de datos (PostgreSQL) establecida exitosamente.");
         } catch (SQLException e) {
-            e.printStackTrace();
-            System.err.println("Error al conectar a la base de datos. Verifica database.properties.");
+            LOGGER.log(Level.SEVERE, "Error al conectar a la base de datos. Verifica database.properties.", e);
         }
     }
 
@@ -57,7 +91,7 @@ public class Singleton {
         Properties props = new Properties();
         try (InputStream input = getClass().getClassLoader().getResourceAsStream("database.properties")) {
             if (input == null) {
-                System.err.println("No se pudo encontrar database.properties en resources.");
+                LOGGER.warning("No se pudo encontrar database.properties en resources.");
                 return;
             }
             props.load(input);
@@ -65,7 +99,7 @@ public class Singleton {
             this.usuario  = props.getProperty("db.user");
             this.clave    = props.getProperty("db.password");
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Error al cargar el archivo database.properties", ex);
         }
     }
 
